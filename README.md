@@ -8,6 +8,9 @@
 go install github.com/abelikoff/vidsim@latest
 ```
 
+> [!NOTE]
+> `vidsim` uses `ffmpeg` tool for frame generation, so make sure the latter is installed as well.
+
 ## Operation
 
 The `vidsim` command supports multiple actions described below.
@@ -36,7 +39,10 @@ To mark a set of video files as pairwise false positives, use the `unmatch` comm
 vidsim -d .my.cache.dir unmatch <video_file1> <video_file2> ...
 ```
 
-NOTE: files must be specified using the same path notation as they were handled by the `process` command. For example, if `<dir1>` was specified (among other directories) then the file underneath that directory should be refered to as `<dir1>/subdir1/subdir2/myfile.avi` - i.e. not as a full path or via `./` notation.
+> [!NOTE]
+> Files must be specified using the same path notation as they were handled by the `process` command. For example,
+> if `<dir1>` was specified (among other directories) then the file underneath that directory should be refered to
+> as `<dir1>/subdir1/subdir2/myfile.avi` - i.e. not as a full path or via `./` notation.
 
 ## Future work
 
