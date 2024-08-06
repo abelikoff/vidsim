@@ -144,6 +144,12 @@ func (proc *Processor) Unmatch(files []string) error {
 	return nil
 }
 
+// Perform state datastore compaction
+
+func (proc *Processor) CompactState() error {
+	return proc.state.CompactDataStore()
+}
+
 func (proc *Processor) ShowSummary() {
 	proc.stats.ShowSummary()
 }

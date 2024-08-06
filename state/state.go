@@ -455,11 +455,176 @@ func (state *State) unmatchFramesPersistent(frameID1, frameID2 int, falsePositiv
 	}
 }
 
+func (state *State) CompactDataStore() error {
+	if !state.persistent {
+		return errors.New("only supported with persistence")
+	}
+
+	validFrames := make(map[int]bool)
+	prefix := []byte(framePrefix)
+
+	// First pass - make sure we are in the right directory. Filenames are stored as relative paths so running
+	// from a wrong place might result in "not files exist anymore" situation, effectively wiping out the state.
+
+	const minViableFraction = 0.4 // at least 40% of files should exist in order to start deleting the entries
+	numFrameEntries := 0
+	numExistingFiles := 0
+
+	err := state.db.Update(func(txn *badger.Txn) error {
+		opts := badger.DefaultIteratorOptions
+		opts.PrefetchValues = false // only need keys
+		it := txn.NewIterator(opts)
+		defer it.Close()
+
+		for it.Seek(prefix); it.ValidForPrefix(prefix); it.Next() {
+			item := it.Item()
+			filename := decodeFrameKey(item.Key())
+			numFrameEntries++
+
+			if _, err := os.Stat(filename); !os.IsNotExist(err) {
+				numExistingFiles++
+			}
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		state.logger.Errorf("Error during frames counting: %s", err)
+	}
+
+	if numFrameEntries == 0 {
+		state.logger.Debug("No entries to compact")
+		return nil
+	}
+
+	if float32(numExistingFiles)/float32(numFrameEntries) < minViableFraction {
+		state.logger.Errorf("Of %d entries in the DB, %d files are missing -- aborting compaction", numFrameEntries, numExistingFiles)
+		return nil
+	}
+
+	numFrameEntriesDeleted := 0
+	numScoreEntries := 0
+	numScoreEntriesDeleted := 0
+
+	err = state.db.Update(func(txn *badger.Txn) error {
+		opts := badger.DefaultIteratorOptions
+		it := txn.NewIterator(opts)
+		defer it.Close()
+
+		for it.Seek(prefix); it.ValidForPrefix(prefix); it.Next() {
+			item := it.Item()
+			filename := decodeFrameKey(item.Key())
+
+			// delete frame entries for non-existent files
+
+			if _, err := os.Stat(filename); os.IsNotExist(err) {
+				state.logger.Debugf("Deleting frame record for '%s'", filename)
+				err := txn.Delete(item.Key())
+
+				if err != nil {
+					state.logger.Errorf("Failed to delete frame record for '%s': %s", filename, err)
+					continue
+				}
+
+				numFrameEntriesDeleted++
+			} else {
+				value, err := item.ValueCopy(nil)
+
+				if err != nil {
+					state.logger.Errorf("Failed to extract frameID for '%s': %s", filename, err)
+					continue
+				}
+
+				frameID := decodeFrameValue(value)
+				validFrames[frameID] = true
+			}
+		}
+		return nil
+	})
+
+	if err != nil {
+		state.logger.Errorf("Error during frames compaction: %s", err)
+	}
+
+	err = state.db.Update(func(txn *badger.Txn) error {
+		opts := badger.DefaultIteratorOptions
+		opts.PrefetchValues = false // Optimize: We only need keys
+		it := txn.NewIterator(opts)
+		defer it.Close()
+
+		for it.Seek(scorePrefix); it.ValidForPrefix(scorePrefix); it.Next() {
+			item := it.Item()
+			numScoreEntries++
+			frameID1, frameID2 := decodeScoreKey(item.Key())
+
+			if !validFrames[frameID1] || !validFrames[frameID2] {
+				state.logger.Debugf("Deleting score record for frame IDs %d, %d", frameID1, frameID2)
+				err := txn.Delete(item.Key())
+
+				if err != nil {
+					state.logger.Errorf("Failed to delete score record for '%d/%d': %s", frameID1, frameID2, err)
+					continue
+				}
+
+				numScoreEntriesDeleted++
+			}
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		state.logger.Errorf("Error during scores compaction: %s", err)
+	}
+
+	err = state.db.RunValueLogGC(0.5) // Compact if 50% of the value log is reclaimable
+
+	if err != nil {
+		state.logger.Errorf("Error during log garbage compaction: %s", err)
+	}
+
+	frameDeletePercentage := 0
+	scoreDeletePercentage := 0
+
+	if numFrameEntries > 0 {
+		frameDeletePercentage = int(float64(numFrameEntriesDeleted) / float64(numFrameEntries) * 100.0)
+	}
+
+	if numScoreEntries > 0 {
+		scoreDeletePercentage = int(float64(numScoreEntriesDeleted) / float64(numScoreEntries) * 100.0)
+	}
+
+	fmt.Printf(`
+SUMMARY
+=======
+
+Total frame records:       %7d
+Frame records deleted:     %7d  (%d%%)
+Total score records:       %7d
+Score records deleted:     %7d  (%d%%)
+
+`, numFrameEntries, numFrameEntriesDeleted, frameDeletePercentage, numScoreEntries, numScoreEntriesDeleted, scoreDeletePercentage)
+
+	return nil
+}
+
 var framePrefix = "f:"
 var scorePrefix = []byte("s:")
+var prefixKeyLength = -1
 
 func encodeFrameKey(path string) []byte {
 	return []byte(framePrefix + path)
+}
+
+// Extract the filename from encoded frame key
+
+func decodeFrameKey(encoded []byte) string {
+	if prefixKeyLength < 0 {
+		prefixKeyLength = len([]byte(framePrefix))
+	}
+
+	return string(encoded[prefixKeyLength:])
 }
 
 func encodeFrameValue(frameID int) []byte {
@@ -486,6 +651,13 @@ func encodeScoreKey(frameID1, frameID2 int) []byte {
 	offset += 8
 	binary.BigEndian.PutUint64(key[offset:], uint64(frameID2))
 	return key
+}
+
+func decodeScoreKey(encoded []byte) (int, int) {
+	prefixLen := len(scorePrefix)
+	frameID1 := int(binary.BigEndian.Uint64(encoded[prefixLen : prefixLen+8]))
+	frameID2 := int(binary.BigEndian.Uint64(encoded[prefixLen+8:]))
+	return frameID1, frameID2
 }
 
 func encodeScoreData(score float32, falsePositive bool) ([]byte, error) {
