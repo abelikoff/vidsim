@@ -19,7 +19,7 @@ from the same directory the original processing was run - otherwise all files in
 considered non-existent and the store effectively wiped out (although the compation logic has
 safety protection against such case).
 `,
-	Run: func(cmd *cobra.Command, args []string) {
+	Run: func(_ *cobra.Command, args []string) {
 		logger := MakeLogger()
 		nWorkers := 1
 		proc := processor.MakeProcessor(nWorkers, *stateDirectory, logger)

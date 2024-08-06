@@ -514,13 +514,14 @@ func (state *State) CompactDataStore() error {
 
 		for it.Seek(prefix); it.ValidForPrefix(prefix); it.Next() {
 			item := it.Item()
-			filename := decodeFrameKey(item.Key())
+			key := item.KeyCopy(nil)
+			filename := decodeFrameKey(key)
 
 			// delete frame entries for non-existent files
 
 			if _, err := os.Stat(filename); os.IsNotExist(err) {
 				state.logger.Debugf("Deleting frame record for '%s'", filename)
-				err := txn.Delete(item.Key())
+				err := txn.Delete(key)
 
 				if err != nil {
 					state.logger.Errorf("Failed to delete frame record for '%s': %s", filename, err)
@@ -548,19 +549,17 @@ func (state *State) CompactDataStore() error {
 	}
 
 	err = state.db.Update(func(txn *badger.Txn) error {
-		opts := badger.DefaultIteratorOptions
-		opts.PrefetchValues = false // Optimize: We only need keys
-		it := txn.NewIterator(opts)
+		it := txn.NewIterator(badger.DefaultIteratorOptions)
 		defer it.Close()
 
 		for it.Seek(scorePrefix); it.ValidForPrefix(scorePrefix); it.Next() {
-			item := it.Item()
+			key := it.Item().KeyCopy(nil)
 			numScoreEntries++
-			frameID1, frameID2 := decodeScoreKey(item.Key())
+			frameID1, frameID2 := decodeScoreKey(key)
 
 			if !validFrames[frameID1] || !validFrames[frameID2] {
 				state.logger.Debugf("Deleting score record for frame IDs %d, %d", frameID1, frameID2)
-				err := txn.Delete(item.Key())
+				err = txn.Delete(key)
 
 				if err != nil {
 					state.logger.Errorf("Failed to delete score record for '%d/%d': %s", frameID1, frameID2, err)
@@ -578,9 +577,9 @@ func (state *State) CompactDataStore() error {
 		state.logger.Errorf("Error during scores compaction: %s", err)
 	}
 
-	err = state.db.RunValueLogGC(0.5) // Compact if 50% of the value log is reclaimable
+	err = state.db.RunValueLogGC(0.5) // GC the log
 
-	if err != nil {
+	if err != nil && err != badger.ErrNoRewrite {
 		state.logger.Errorf("Error during log garbage compaction: %s", err)
 	}
 

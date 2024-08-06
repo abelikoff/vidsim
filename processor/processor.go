@@ -41,7 +41,7 @@ type Processor struct {
 }
 
 func MakeProcessor(numWorkers int, stateDirectory string, logger *logrus.Logger) *Processor {
-	if numWorkers < 2 || numWorkers > 64 {
+	if numWorkers < 1 || numWorkers > 64 {
 		logger.Fatalf("Bad number of workers: %d", numWorkers)
 	}
 
