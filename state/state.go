@@ -460,7 +460,6 @@ func (state *State) CompactDataStore() error {
 		return errors.New("only supported with persistence")
 	}
 
-	validFrames := make(map[int]bool)
 	prefix := []byte(framePrefix)
 
 	// First pass - make sure we are in the right directory. Filenames are stored as relative paths so running
@@ -499,10 +498,13 @@ func (state *State) CompactDataStore() error {
 	}
 
 	if float32(numExistingFiles)/float32(numFrameEntries) < minViableFraction {
-		state.logger.Errorf("Of %d entries in the DB, %d files are missing -- aborting compaction", numFrameEntries, numExistingFiles)
+		state.logger.Errorf("Of %d entries in the DB, only %d files are present -- aborting compaction", numFrameEntries, numExistingFiles)
 		return nil
 	}
 
+	// Second pass - delete frame mapping entries that correspond to files that no longer exist.
+
+	validFrames := make(map[int]bool) // collect all valid frameIDs for the 3rd pass
 	numFrameEntriesDeleted := 0
 	numScoreEntries := 0
 	numScoreEntriesDeleted := 0
@@ -547,6 +549,8 @@ func (state *State) CompactDataStore() error {
 	if err != nil {
 		state.logger.Errorf("Error during frames compaction: %s", err)
 	}
+
+	// Third pass - delete comparison (score) records that reference the files that no longer exist.
 
 	err = state.db.Update(func(txn *badger.Txn) error {
 		it := txn.NewIterator(badger.DefaultIteratorOptions)
@@ -595,15 +599,11 @@ func (state *State) CompactDataStore() error {
 	}
 
 	fmt.Printf(`
-SUMMARY
-=======
+Summary:
+* Deleted %d (%d%%) out of %d frame mapping records.
+* Deleted %d (%d%%) out of %d comparison score records.
 
-Total frame records:       %7d
-Frame records deleted:     %7d  (%d%%)
-Total score records:       %7d
-Score records deleted:     %7d  (%d%%)
-
-`, numFrameEntries, numFrameEntriesDeleted, frameDeletePercentage, numScoreEntries, numScoreEntriesDeleted, scoreDeletePercentage)
+`, numFrameEntriesDeleted, frameDeletePercentage, numFrameEntries, numScoreEntriesDeleted, scoreDeletePercentage, numScoreEntries)
 
 	return nil
 }
