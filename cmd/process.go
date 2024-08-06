@@ -14,6 +14,7 @@ import (
 
 var chromTolerance *float64 // Chrominance tolerance flag
 var propTolerance *float64  // Proportion tolerance flag
+var useAbsolutePaths *bool  // Whether to store filenames with absolute paths.
 
 // processCmd represents the process command
 var processCmd = &cobra.Command{
@@ -35,6 +36,7 @@ it consideres similar. The report is output in JSON format.
 		proc := processor.MakeProcessor(nWorkers, *stateDirectory, logger)
 		proc.ChrTolerance = *chromTolerance
 		proc.PropTolerance = *propTolerance
+		proc.UseAbsolutePaths = *useAbsolutePaths
 
 		if *outputFile != "" {
 			f, err := os.Create(*outputFile)
@@ -74,6 +76,8 @@ func init() {
 	// is called directly, e.g.:
 	// processCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
 
+	useAbsolutePaths = processCmd.Flags().BoolP("abs_paths", "A",
+		false, "Store filenames with absolute paths")
 	chromTolerance = processCmd.Flags().Float64P("chr_tolerance", "",
 		processor.DefaultChrominanceTolerance, "Chrominance tolerance level")
 	propTolerance = processCmd.Flags().Float64P("prop_tolerance", "",

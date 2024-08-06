@@ -82,6 +82,15 @@ func (proc *Processor) fgSendJobs(directories []string, requestQueue chan fgRequ
 				return nil
 			}
 
+			if proc.UseAbsolutePaths {
+				orgpath := path
+				path, err = normalizePath(path)
+
+				if err != nil {
+					proc.logger.Fatalf("Failed to normalize path for '%s': %v", orgpath, err)
+				}
+			}
+
 			frameID, found := proc.state.RegisterFile(path)
 			(*frames)[frameID] = true
 			frameFile := proc.state.GetFrameFileName(frameID)
@@ -209,4 +218,26 @@ func (proc *Processor) isEligibleFile(path string) bool {
 	}
 
 	return true
+}
+
+func normalizePath(relativePath string) (string, error) {
+	if relativePath == "" || filepath.IsAbs(relativePath) {
+		return relativePath, nil
+	}
+
+	cwd, err := os.Getwd()
+
+	if err != nil {
+		return "", fmt.Errorf("error getting working directory: %v", err)
+	}
+
+	fullPath := filepath.Join(cwd, relativePath)
+
+	normalizedPath, err := filepath.Abs(fullPath)
+
+	if err != nil {
+		return "", fmt.Errorf("error normalizing path: %v", err)
+	}
+
+	return normalizedPath, nil
 }

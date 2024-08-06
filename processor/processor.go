@@ -31,6 +31,8 @@ type Processor struct {
 	QuietMode    bool          // be really quiet (only show warnings and errors)
 	OutputWriter *bufio.Writer // where to write the report (nil means stdout)
 
+	UseAbsolutePaths bool // When true filenames will be stored in the state with absolute paths.
+
 	// These two parameters govern the image comparison.
 	// See https://pkg.go.dev/github.com/vitali-fedulov/images4@v1.3.1#CustomCoefficients for more details.
 	//
