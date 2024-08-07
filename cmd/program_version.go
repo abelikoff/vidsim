@@ -1,3 +1,3 @@
 package cmd
 
-var VersionString = "1.0.0"
+var VersionString = "1.1.0"
