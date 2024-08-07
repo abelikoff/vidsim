@@ -555,6 +555,9 @@ func (state *State) CompactDataStore() error {
 	err = state.db.Update(func(txn *badger.Txn) error {
 		it := txn.NewIterator(badger.DefaultIteratorOptions)
 		defer it.Close()
+		const maxBatchSize = 1000
+		batchSize := 0
+		wb := state.db.NewWriteBatch()
 
 		for it.Seek(scorePrefix); it.ValidForPrefix(scorePrefix); it.Next() {
 			key := it.Item().KeyCopy(nil)
@@ -563,28 +566,39 @@ func (state *State) CompactDataStore() error {
 
 			if !validFrames[frameID1] || !validFrames[frameID2] {
 				state.logger.Debugf("Deleting score record for frame IDs %d, %d", frameID1, frameID2)
-				err = txn.Delete(key)
+				// err = txn.Delete(key)
+				err = wb.Delete(key)
 
 				if err != nil {
-					state.logger.Errorf("Failed to delete score record for '%d/%d': %s", frameID1, frameID2, err)
-					continue
+					state.logger.Errorf("Failed to delete score record for '%d/%d': %v", frameID1, frameID2, err)
 				}
 
 				numScoreEntriesDeleted++
+				batchSize++
+
+				if batchSize >= maxBatchSize {
+					if err = wb.Flush(); err != nil {
+						state.logger.Errorf("Failed to flush batch: %v", err)
+					}
+
+					wb = state.db.NewWriteBatch()
+					batchSize = 0
+				}
 			}
 		}
 
+		wb.Cancel()
 		return nil
 	})
 
 	if err != nil {
-		state.logger.Errorf("Error during scores compaction: %s", err)
+		state.logger.Errorf("Error during scores compaction: %v", err)
 	}
 
 	err = state.db.RunValueLogGC(0.5) // GC the log
 
 	if err != nil && err != badger.ErrNoRewrite {
-		state.logger.Errorf("Error during log garbage compaction: %s", err)
+		state.logger.Errorf("Error during log garbage compaction: %v", err)
 	}
 
 	frameDeletePercentage := 0

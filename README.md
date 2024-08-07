@@ -8,8 +8,7 @@
 go install github.com/abelikoff/vidsim@latest
 ```
 
-> [!NOTE]
-> `vidsim` uses `ffmpeg` tool for frame generation, so make sure the latter is installed as well.
+> [!NOTE] > `vidsim` uses `ffmpeg` tool for frame generation, so make sure the latter is installed as well.
 
 ## Operation
 
@@ -39,10 +38,22 @@ To mark a set of video files as pairwise false positives, use the `unmatch` comm
 vidsim -d .my.cache.dir unmatch <video_file1> <video_file2> ...
 ```
 
-> [!NOTE]
-> Files must be specified using the same path notation as they were handled by the `process` command. For example,
-> if `<dir1>` was specified (among other directories) then the file underneath that directory should be refered to
-> as `<dir1>/subdir1/subdir2/myfile.avi` - i.e. not as a full path or via `./` notation.
+### Compacting the state
+
+State can be compacted, removing data for files that no longer exist:
+
+```sh
+vidsim -d .my.cache.dir compact
+```
+
+### Considerations about filenames
+
+By default `vidsim` saves filenames using relative (to the top directories specified) paths. This has two implications:
+
+-   When operating on files (e.g. marking false positives), paths have to be specified precisely using that convention.
+-   When compacting the state, the command should be run _in the same directory where `process` command was run_, otherwise `vidsim` will not find the files listed in the state and will think those files have been deleted (it does have a sanity check agains mass deletion however).
+
+Alternatively, one can specify a `--abs_paths` option to make `vidsim` store absolute paths. This takes more space but it avoids the problem above.
 
 ## Future work
 
