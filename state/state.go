@@ -462,7 +462,7 @@ func (state *State) CompactDataStore() error {
 
 	prefix := []byte(framePrefix)
 
-	// First pass - make sure we are in the right directory. Filenames are stored as relative paths so running
+	// Step 1 - make sure we are in the right directory. Filenames are stored as relative paths so running
 	// from a wrong place might result in "not files exist anymore" situation, effectively wiping out the state.
 
 	const minViableFraction = 0.4 // at least 40% of files should exist in order to start deleting the entries
@@ -502,9 +502,10 @@ func (state *State) CompactDataStore() error {
 		return nil
 	}
 
-	// Second pass - delete frame mapping entries that correspond to files that no longer exist.
+	// Step 2 - delete frame mapping entries that correspond to files that no longer exist.
 
-	validFrames := make(map[int]bool) // collect all valid frameIDs for the 3rd pass
+	validFrames := make(map[int]bool)    // collect all valid frameIDs for Step 3
+	validImages := make(map[string]bool) // collect all valid image filenames for Step 4
 	numFrameEntriesDeleted := 0
 	numScoreEntries := 0
 	numScoreEntriesDeleted := 0
@@ -541,6 +542,7 @@ func (state *State) CompactDataStore() error {
 
 				frameID := decodeFrameValue(value)
 				validFrames[frameID] = true
+				validImages[state.GetFrameFileName(frameID)] = true
 			}
 		}
 		return nil
@@ -550,7 +552,7 @@ func (state *State) CompactDataStore() error {
 		state.logger.Errorf("Error during frames compaction: %s", err)
 	}
 
-	// Third pass - delete comparison (score) records that reference the files that no longer exist.
+	// Step 3 - delete comparison (score) records that reference the files that no longer exist.
 
 	err = state.db.Update(func(txn *badger.Txn) error {
 		it := txn.NewIterator(badger.DefaultIteratorOptions)
@@ -601,8 +603,29 @@ func (state *State) CompactDataStore() error {
 		state.logger.Errorf("Error during log garbage compaction: %v", err)
 	}
 
+	// Step 4 - clean up stale image files
+
+	files, err := filepath.Glob(filepath.Join(state.dataDirectory, "*.jpg"))
+	numImageFilesProcessed := 0
+	numImageFilesDeleted := 0
+
+	if err != nil {
+		state.logger.Errorf("Failed to glob image files: %v", err)
+	} else {
+		for _, imageFile := range files {
+			numImageFilesProcessed++
+
+			if !validImages[imageFile] {
+				state.logger.Debugf("Deleting stale image file '%s'", imageFile)
+				os.Remove(imageFile)
+				numImageFilesDeleted++
+			}
+		}
+	}
+
 	frameDeletePercentage := 0
 	scoreDeletePercentage := 0
+	fileDeletePercentage := 0
 
 	if numFrameEntries > 0 {
 		frameDeletePercentage = int(float64(numFrameEntriesDeleted) / float64(numFrameEntries) * 100.0)
@@ -612,12 +635,19 @@ func (state *State) CompactDataStore() error {
 		scoreDeletePercentage = int(float64(numScoreEntriesDeleted) / float64(numScoreEntries) * 100.0)
 	}
 
+	if numImageFilesProcessed > 0 {
+		fileDeletePercentage = int(float64(numImageFilesDeleted) / float64(numImageFilesProcessed) * 100.0)
+	}
+
 	fmt.Printf(`
 Summary:
 * Deleted %d (%d%%) out of %d frame mapping records.
 * Deleted %d (%d%%) out of %d comparison score records.
+* Deleted %d (%d%%) out of %d frame files.
 
-`, numFrameEntriesDeleted, frameDeletePercentage, numFrameEntries, numScoreEntriesDeleted, scoreDeletePercentage, numScoreEntries)
+`, numFrameEntriesDeleted, frameDeletePercentage, numFrameEntries,
+		numScoreEntriesDeleted, scoreDeletePercentage, numScoreEntries,
+		numImageFilesDeleted, fileDeletePercentage, numImageFilesProcessed)
 
 	return nil
 }
