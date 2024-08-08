@@ -57,8 +57,5 @@ Alternatively, one can specify a `--abs_paths` option to make `vidsim` store abs
 
 ## Future work
 
--   Further optimize Badger usage.
 -   Add a `peek` command to examine the cached data.
--   Add a `compact` command to compact the cached data.
--   Add `-debug` command.
 -   Display cache statistics during processing.
