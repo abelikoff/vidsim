@@ -154,7 +154,7 @@ func (proc *Processor) compareImageFiles(imageFile1 string, imageFile2 string) (
 }
 
 func (proc *Processor) bucketResults(frameID1, frameID2 int, score float32) {
-	if score < 0 {
+	if proc.isFalsePositive(score) {
 		proc.stats.NumFalsePositives++
 	} else if score <= SimilarityThreshold {
 
@@ -176,4 +176,8 @@ func (proc *Processor) bucketResults(frameID1, frameID2 int, score float32) {
 		proc.stats.NumMatches++
 		proc.bucketMutex.Unlock()
 	}
+}
+
+func (proc *Processor) isFalsePositive(score float32) bool {
+	return score < 0 && !proc.IgnoreFalsePositives
 }

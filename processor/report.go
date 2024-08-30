@@ -15,6 +15,25 @@ func (proc *Processor) GenerateReport() {
 		writer = bufio.NewWriter(os.Stdout)
 	}
 
+	defer writer.Flush()
+
+	// Don't generate empty JSON list - produce empty file instead
+
+	empty := true
+
+	for _, frames := range proc.groups {
+		if len(frames) < 2 {
+			continue
+		}
+
+		empty = false
+		break
+	}
+
+	if empty {
+		return
+	}
+
 	fmt.Fprint(writer, "[")
 	bucketsep := "\n  "
 
@@ -41,5 +60,4 @@ func (proc *Processor) GenerateReport() {
 	}
 
 	fmt.Fprint(writer, "\n]")
-	writer.Flush()
 }
