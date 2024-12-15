@@ -1,6 +1,7 @@
 package state
 
 import (
+	"bufio"
 	"encoding/binary"
 	"errors"
 	"fmt"
@@ -231,7 +232,7 @@ func (state *State) getMaxFrameID() (int, error) {
 		return 0, errors.New("only supported with persistence")
 	}
 
-	var maxFrameID int = 0
+	var maxFrameID int
 	prefix := []byte(framePrefix)
 	err := state.db.View(func(txn *badger.Txn) error {
 		opts := badger.DefaultIteratorOptions
@@ -241,7 +242,7 @@ func (state *State) getMaxFrameID() (int, error) {
 
 		for it.Seek(prefix); it.ValidForPrefix(prefix); it.Next() {
 			item := it.Item()
-			//key := item.Key()
+			// key := item.Key()
 
 			// Extract integer from value bytes
 			err := item.Value(func(val []byte) error {
@@ -391,7 +392,7 @@ func (state *State) getComparisonScorePersistent(frameID1, frameID2 int) (float3
 	})
 
 	if err != nil {
-		if err != badger.ErrKeyNotFound {
+		if !errors.Is(err, badger.ErrKeyNotFound) {
 			state.logger.Errorf("GetComparisonScorePersistent(%d, %d): %s",
 				frameID1, frameID2, err)
 		}
@@ -498,7 +499,8 @@ func (state *State) CompactDataStore() error {
 	}
 
 	if float32(numExistingFiles)/float32(numFrameEntries) < minViableFraction {
-		state.logger.Errorf("Of %d entries in the DB, only %d files are present -- aborting compaction", numFrameEntries, numExistingFiles)
+		state.logger.Errorf("Of %d entries in the DB, only %d files are present -- aborting compaction",
+			numFrameEntries, numExistingFiles)
 		return nil
 	}
 
@@ -524,7 +526,7 @@ func (state *State) CompactDataStore() error {
 
 			if _, err := os.Stat(filename); os.IsNotExist(err) {
 				state.logger.Debugf("Deleting frame record for '%s'", filename)
-				err := txn.Delete(key)
+				err = txn.Delete(key)
 
 				if err != nil {
 					state.logger.Errorf("Failed to delete frame record for '%s': %s", filename, err)
@@ -597,9 +599,10 @@ func (state *State) CompactDataStore() error {
 		state.logger.Errorf("Error during scores compaction: %v", err)
 	}
 
-	err = state.db.RunValueLogGC(0.5) // GC the log
+	gcDiscardRatio := 0.5
+	err = state.db.RunValueLogGC(gcDiscardRatio) // GC the log
 
-	if err != nil && err != badger.ErrNoRewrite {
+	if err != nil && !errors.Is(err, badger.ErrNoRewrite) {
 		state.logger.Errorf("Error during log garbage compaction: %v", err)
 	}
 
@@ -650,6 +653,77 @@ Summary:
 		numImageFilesDeleted, fileDeletePercentage, numImageFilesProcessed)
 
 	return nil
+}
+
+// Dump state
+
+func (state *State) Dump(writer *bufio.Writer) error {
+	if !state.persistent {
+		return errors.New(`only supported with persistence`)
+	}
+
+	// Dump frame information
+
+	prefix := []byte(framePrefix)
+
+	dbErr := state.db.View(func(txn *badger.Txn) error {
+		opts := badger.DefaultIteratorOptions
+		it := txn.NewIterator(opts)
+		defer it.Close()
+
+		for it.Seek(prefix); it.ValidForPrefix(prefix); it.Next() {
+			item := it.Item()
+			filename := decodeFrameKey(item.Key())
+			value, err := item.ValueCopy(nil)
+
+			if err != nil {
+				state.logger.Errorf("Failed to extract frameID for '%s': %s", filename, err)
+				continue
+			}
+
+			frameID := decodeFrameValue(value)
+			fmt.Fprintf(writer, "frame %6d  %20s  %s\n", frameID, state.GetFrameFileName(frameID), filename)
+		}
+
+		return nil
+	})
+
+	if dbErr != nil {
+		state.logger.Errorf("dumping frame information: %s", dbErr)
+	}
+
+	// Dump comparison score information
+
+	prefix = scorePrefix
+
+	dbErr = state.db.View(func(txn *badger.Txn) error {
+		opts := badger.DefaultIteratorOptions
+		it := txn.NewIterator(opts)
+		defer it.Close()
+
+		for it.Seek(prefix); it.ValidForPrefix(prefix); it.Next() {
+			item := it.Item()
+			frameID1, frameID2 := decodeScoreKey(item.Key())
+			value, err := item.ValueCopy(nil)
+
+			if err != nil {
+				state.logger.Errorf("Failed to extract score information for %d, %d: %s",
+					frameID1, frameID2, err)
+				continue
+			}
+
+			score, falsePositive := decodeScoreData(value)
+			fmt.Fprintf(writer, "score %6d  %6d  %.4f  %v\n", frameID1, frameID2, score, falsePositive)
+		}
+
+		return nil
+	})
+
+	if dbErr != nil {
+		state.logger.Errorf("dumping score information: %s", dbErr)
+	}
+
+	return dbErr
 }
 
 var framePrefix = "f:"

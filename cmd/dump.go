@@ -4,39 +4,42 @@ Copyright © 2024 Alexander L. Belikoff <alexander@belikoff.net>
 package cmd
 
 import (
+	"bufio"
+	"os"
+
 	"github.com/abelikoff/vidsim/processor"
 	"github.com/spf13/cobra"
 )
 
-// compactCmd represents the compact command
-var compactCmd = &cobra.Command{
-	Use:   "compact",
-	Short: "Compact the state database",
-	Long: `Delete records corresponding to the files that no longer exist and compact the database.
-
-IMPORTANT: Since the filenames are stored with relative paths, it is critical to run the compaction
-from the same directory the original processing was run - otherwise all files in the store would be
-considered non-existent and the store effectively wiped out (although the compation logic has
-safety protection against such case).
-`,
+// dumpCmd represents the dump command
+var dumpCmd = &cobra.Command{
+	Use:   "dump",
+	Short: "Dump the state database",
 	Run: func(_ *cobra.Command, args []string) {
 		logger := MakeLogger()
 		nWorkers := 1
 		proc := processor.MakeProcessor(nWorkers, *stateDirectory, logger)
-		proc.ChrTolerance = *chromTolerance
-		proc.PropTolerance = *propTolerance
-		proc.QuietMode = *quietMode
 
-		err := proc.CompactState()
+		if *outputFile != "" {
+			f, err := os.Create(*outputFile)
+
+			if err != nil {
+				logger.Fatalf("Cannot open output file '%s': %s", *outputFile, err)
+			}
+
+			proc.OutputWriter = bufio.NewWriter(f)
+		}
+
+		err := proc.DumpState()
 
 		if err != nil {
-			logger.Fatal("Compaction failed")
+			logger.Fatalf("Dump failed: %s\n", err)
 		}
 	},
 }
 
 func init() {
-	rootCmd.AddCommand(compactCmd)
+	rootCmd.AddCommand(dumpCmd)
 
 	// Here you will define your flags and configuration settings.
 

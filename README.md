@@ -46,6 +46,14 @@ State can be compacted, removing data for files that no longer exist:
 vidsim -d .my.cache.dir compact
 ```
 
+### Dumping the state
+
+You can dump the accumulated state (frame information, comparison scores):
+
+```sh
+vidsim -d .my.cache.dir dump
+```
+
 ### Considerations about filenames
 
 By default `vidsim` saves filenames using relative (to the top directories specified) paths. This has two implications:

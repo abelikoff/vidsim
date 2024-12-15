@@ -153,6 +153,21 @@ func (proc *Processor) CompactState() error {
 	return proc.state.CompactDataStore()
 }
 
+// Dump the state
+
+func (proc *Processor) DumpState() error {
+	var writer *bufio.Writer
+
+	if proc.OutputWriter != nil {
+		writer = proc.OutputWriter
+	} else {
+		writer = bufio.NewWriter(os.Stdout)
+	}
+
+	defer writer.Flush()
+	return proc.state.Dump(writer)
+}
+
 func (proc *Processor) ShowSummary() {
 	proc.stats.ShowSummary()
 }
