@@ -470,6 +470,7 @@ func (state *State) CompactDataStore() error {
 	numFrameEntries := 0
 	numExistingFiles := 0
 
+	state.logger.Debug("STAGE 1: checking against an extinction event")
 	err := state.db.Update(func(txn *badger.Txn) error {
 		opts := badger.DefaultIteratorOptions
 		opts.PrefetchValues = false // only need keys
@@ -506,6 +507,7 @@ func (state *State) CompactDataStore() error {
 
 	// Step 2 - delete frame mapping entries that correspond to files that no longer exist.
 
+	state.logger.Debug("STAGE 2: removing stale frame records")
 	validFrames := make(map[int]bool)    // collect all valid frameIDs for Step 3
 	validImages := make(map[string]bool) // collect all valid image filenames for Step 4
 	numFrameEntriesDeleted := 0
@@ -556,6 +558,7 @@ func (state *State) CompactDataStore() error {
 
 	// Step 3 - delete comparison (score) records that reference the files that no longer exist.
 
+	state.logger.Debug("STAGE 3: removing stale comparison scores")
 	err = state.db.Update(func(txn *badger.Txn) error {
 		it := txn.NewIterator(badger.DefaultIteratorOptions)
 		defer it.Close()
@@ -581,6 +584,8 @@ func (state *State) CompactDataStore() error {
 				batchSize++
 
 				if batchSize >= maxBatchSize {
+					state.logger.Debugf("Flushing work batch (%d)", batchSize)
+
 					if err = wb.Flush(); err != nil {
 						state.logger.Errorf("Failed to flush batch: %v", err)
 					}
@@ -591,7 +596,12 @@ func (state *State) CompactDataStore() error {
 			}
 		}
 
-		wb.Cancel()
+		state.logger.Debug("Flushing final work batch")
+
+		if err = wb.Flush(); err != nil {
+			state.logger.Errorf("Failed to flush batch: %v", err)
+		}
+		// wb.Cancel()
 		return nil
 	})
 
@@ -599,6 +609,7 @@ func (state *State) CompactDataStore() error {
 		state.logger.Errorf("Error during scores compaction: %v", err)
 	}
 
+	state.logger.Debug("Garbage collecting")
 	gcDiscardRatio := 0.5
 	err = state.db.RunValueLogGC(gcDiscardRatio) // GC the log
 
@@ -608,6 +619,7 @@ func (state *State) CompactDataStore() error {
 
 	// Step 4 - clean up stale image files
 
+	state.logger.Debug("STAGE 4: removing stale image files")
 	files, err := filepath.Glob(filepath.Join(state.dataDirectory, "*.jpg"))
 	numImageFilesProcessed := 0
 	numImageFilesDeleted := 0
