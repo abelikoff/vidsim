@@ -28,6 +28,12 @@ Since frame extraction and comparison are relatively slow and expensive, `vidsim
 vidsim -d .my.cache.dir process <dir1> <dir2> ...
 ```
 
+### Controlling the matching logic
+
+### Clustering matches
+
+By default `vidsim` clusters matches. If files `A` and `B` match and later files `B` and `C` match, all 3 files will be grouped together. When match parameters are really sensitive (generating a lot of false positives while reducing false negatives) this behavior might result in very large clusters of many false positives. One might disable such clustering using the option `--no_cluster` which will make each pair treated as a separate match.
+
 ### Handle false positives
 
 Since the comparison logic is imprecise, the will inevitably false positive matches: videos identified as similar, which are not. Running the tool repeatedly and revisiting those false positives again and again is annoying and distracting. To address this, `vidsim` allows marking pairs of videos as false positive matches, so that when it runs next time, this pair of videos will not be reported as a match. Naturally, this is only supported with caching on.

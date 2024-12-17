@@ -436,6 +436,7 @@ func (state *State) setComparisonScorePersistent(frameID1, frameID2 int, score f
 
 func (state *State) unmatchFramesPersistent(frameID1, frameID2 int, falsePositive bool) {
 	err := state.db.Update(func(txn *badger.Txn) error {
+		state.logger.Debugf("Marking match for %d, %d as false positive", frameID1, frameID2)
 		key := encodeScoreKey(frameID1, frameID2)
 		item, err := txn.Get(key)
 

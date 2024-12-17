@@ -1,3 +1,6 @@
+/*
+Copyright © 2024 Alexander L. Belikoff <alexander@belikoff.net>
+*/
 package processor
 
 import (
@@ -32,7 +35,8 @@ type Processor struct {
 	OutputWriter *bufio.Writer // where to write the report (nil means stdout)
 
 	UseAbsolutePaths     bool // When true filenames will be stored in the state with absolute paths
-	IgnoreFalsePositives bool // Trat false positives as matches
+	IgnoreFalsePositives bool // Treat false positives as matches
+	DontCluster          bool // Do not cluster multiple matches together
 
 	// These two parameters govern the image comparison.
 	// See https://pkg.go.dev/github.com/vitali-fedulov/images4@v1.3.1#CustomCoefficients for more details.

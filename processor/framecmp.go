@@ -163,7 +163,16 @@ func (proc *Processor) bucketResults(frameID1, frameID2 int, score float32) {
 
 		var resultingBucket int
 
-		if bucket, found := proc.frameBuckets[frameID1]; found {
+		// Make clusters more deterministic by always preferring the bucket associated with the
+		// frameID with a smaller number.
+
+		if frameID1 > frameID2 {
+			frameID1, frameID2 = frameID2, frameID1
+		}
+
+		if proc.DontCluster {
+			resultingBucket = proc.newBucket()
+		} else if bucket, found := proc.frameBuckets[frameID1]; found {
 			resultingBucket = bucket
 		} else if bucket, found := proc.frameBuckets[frameID2]; found {
 			resultingBucket = bucket

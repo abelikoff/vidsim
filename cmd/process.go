@@ -1,5 +1,5 @@
 /*
-Copyright © 2024 NAME HERE <EMAIL ADDRESS>
+Copyright © 2024 Alexander L. Belikoff <alexander@belikoff.net>
 */
 package cmd
 
@@ -16,6 +16,7 @@ var chromTolerance *float64    // Chrominance tolerance flag
 var propTolerance *float64     // Proportion tolerance flag
 var useAbsolutePaths *bool     // Whether to store filenames with absolute paths
 var ignoreFalsePositives *bool // Tread false positives as matches
+var dontCluster *bool          // Do not cluster multiple matches together
 
 // processCmd represents the process command
 var processCmd = &cobra.Command{
@@ -39,6 +40,7 @@ it consideres similar. The report is output in JSON format.
 		proc.PropTolerance = *propTolerance
 		proc.UseAbsolutePaths = *useAbsolutePaths
 		proc.IgnoreFalsePositives = *ignoreFalsePositives
+		proc.DontCluster = *dontCluster
 
 		if *outputFile != "" {
 			f, err := os.Create(*outputFile)
@@ -78,6 +80,8 @@ func init() {
 	// is called directly, e.g.:
 	// processCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
 
+	dontCluster = processCmd.Flags().BoolP("no_cluster", "",
+		false, "Do not cluster matches")
 	useAbsolutePaths = processCmd.Flags().BoolP("abs_paths", "A",
 		false, "Store filenames with absolute paths")
 	ignoreFalsePositives = processCmd.Flags().BoolP("ignore_false_positives", "",
