@@ -34,9 +34,10 @@ type Processor struct {
 	QuietMode    bool          // be really quiet (only show warnings and errors)
 	OutputWriter *bufio.Writer // where to write the report (nil means stdout)
 
-	UseAbsolutePaths     bool // When true filenames will be stored in the state with absolute paths
-	IgnoreFalsePositives bool // Treat false positives as matches
-	DontCluster          bool // Do not cluster multiple matches together
+	ScorePrefix          string // Prefix to use for score records
+	UseAbsolutePaths     bool   // When true filenames will be stored in the state with absolute paths
+	IgnoreFalsePositives bool   // Treat false positives as matches
+	DontCluster          bool   // Do not cluster multiple matches together
 
 	// These two parameters govern the image comparison.
 	// See https://pkg.go.dev/github.com/vitali-fedulov/images4@v1.3.1#CustomCoefficients for more details.
@@ -61,8 +62,7 @@ func MakeProcessor(numWorkers int, stateDirectory string, logger *logrus.Logger)
 	proc.PropTolerance = DefaultProportionTolerance
 
 	proc.bucketMutex = sync.Mutex{}
-
-	err := proc.state.Init(stateDirectory, logger)
+	err := proc.state.Init(stateDirectory, logger, proc.ScorePrefix)
 
 	if err != nil {
 		logger.Fatalf("Failed to initialize state: %s", err)

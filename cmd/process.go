@@ -12,6 +12,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
+var scorePrefix *string        // Prefix to use for score records
 var chromTolerance *float64    // Chrominance tolerance flag
 var propTolerance *float64     // Proportion tolerance flag
 var useAbsolutePaths *bool     // Whether to store filenames with absolute paths
@@ -41,6 +42,7 @@ it consideres similar. The report is output in JSON format.
 		proc.UseAbsolutePaths = *useAbsolutePaths
 		proc.IgnoreFalsePositives = *ignoreFalsePositives
 		proc.DontCluster = *dontCluster
+		proc.ScorePrefix = *scorePrefix
 
 		if *outputFile != "" {
 			f, err := os.Create(*outputFile)
@@ -80,6 +82,8 @@ func init() {
 	// is called directly, e.g.:
 	// processCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
 
+	scorePrefix = processCmd.Flags().StringP("score_prefix", "p", "",
+		"Prefix to use for score data")
 	dontCluster = processCmd.Flags().BoolP("no_cluster", "",
 		false, "Do not cluster matches")
 	useAbsolutePaths = processCmd.Flags().BoolP("abs_paths", "A",

@@ -22,6 +22,7 @@ type matchScore struct {
 type State struct {
 	dataDirectory string
 	persistent    bool           // should we load and save the state?
+	ScorePrefix   string         // prefix for score records
 	image2frame   map[string]int // video filename -> frame ID
 	frame2image   map[int]string // frame ID -> video filename
 	nextframeID   int
@@ -32,6 +33,9 @@ type State struct {
 	db     *badger.DB
 	logger *logrus.Logger
 }
+
+var framePrefix = "f:"
+var scorePrefix []byte
 
 func MakeState() *State {
 	state := new(State)
@@ -45,7 +49,7 @@ func MakeState() *State {
 	return state
 }
 
-func (state *State) Init(stateDirectory string, logger *logrus.Logger) error {
+func (state *State) Init(stateDirectory string, logger *logrus.Logger, customScorePrefix string) error {
 	state.logger = logger
 
 	if stateDirectory == "" {
@@ -67,6 +71,12 @@ func (state *State) Init(stateDirectory string, logger *logrus.Logger) error {
 	}
 
 	if state.persistent {
+		if customScorePrefix != "" {
+			scorePrefix = []byte("s:" + customScorePrefix + ":")
+		} else {
+			scorePrefix = []byte("s:")
+		}
+
 		var err error
 		state.db, err = badger.Open(badger.DefaultOptions(filepath.Join(state.dataDirectory, "db")).WithLogger(nil))
 
@@ -739,8 +749,6 @@ func (state *State) Dump(writer *bufio.Writer) error {
 	return dbErr
 }
 
-var framePrefix = "f:"
-var scorePrefix = []byte("s:")
 var prefixKeyLength = -1
 
 func encodeFrameKey(path string) []byte {

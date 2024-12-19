@@ -28,7 +28,7 @@ Since frame extraction and comparison are relatively slow and expensive, `vidsim
 vidsim -d .my.cache.dir process <dir1> <dir2> ...
 ```
 
-### Controlling the matching logic
+## Controlling the matching logic
 
 ### Clustering matches
 
@@ -43,6 +43,22 @@ To mark a set of video files as pairwise false positives, use the `unmatch` comm
 ```sh
 vidsim -d .my.cache.dir unmatch <video_file1> <video_file2> ...
 ```
+
+## State management
+
+### Multiple runs with different image comparison parameters
+
+One can do multiple runs using different parameters or tools governing image comparison. To save and use comparison scores for such runs side by side, one can use a "prefix" which is stored along with comparison scores via `--score_prefix` (or `-p`) option, for example:
+
+```bash
+# First run with default comparison:
+vidsim -d .my.cache.dir process -p run1 <dir1> <dir2> ...
+
+# Second run with more strict comparison logic:
+vidsim -d .my.cache.dir process -p run2 --chr_tolerance 5.22 <dir1> <dir2> ...
+```
+
+Comparison scores for both runs will be stored in the state without intermixing with each other.
 
 ### Compacting the state
 
