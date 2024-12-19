@@ -12,12 +12,14 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var scorePrefix *string        // Prefix to use for score records
-var chromTolerance *float64    // Chrominance tolerance flag
-var propTolerance *float64     // Proportion tolerance flag
-var useAbsolutePaths *bool     // Whether to store filenames with absolute paths
-var ignoreFalsePositives *bool // Tread false positives as matches
-var dontCluster *bool          // Do not cluster multiple matches together
+var externalComparisonPgm *string // External program for image comparison
+var similarityThreshold *float32  // Custom similarity threshold
+var scorePrefix *string           // Prefix to use for score records
+var chromTolerance *float64       // Chrominance tolerance flag
+var propTolerance *float64        // Proportion tolerance flag
+var useAbsolutePaths *bool        // Whether to store filenames with absolute paths
+var ignoreFalsePositives *bool    // Tread false positives as matches
+var dontCluster *bool             // Do not cluster multiple matches together
 
 // processCmd represents the process command
 var processCmd = &cobra.Command{
@@ -43,6 +45,13 @@ it consideres similar. The report is output in JSON format.
 		proc.IgnoreFalsePositives = *ignoreFalsePositives
 		proc.DontCluster = *dontCluster
 		proc.ScorePrefix = *scorePrefix
+		proc.ExternalComparisonTool = *externalComparisonPgm
+
+		if *similarityThreshold < 0 || *similarityThreshold > 1 {
+			logger.Fatalf("Bad similarity threshold: %f", *similarityThreshold)
+		}
+
+		proc.SimilarityThreshold = *similarityThreshold
 
 		if *outputFile != "" {
 			f, err := os.Create(*outputFile)
@@ -71,6 +80,7 @@ it consideres similar. The report is output in JSON format.
 
 func init() {
 	rootCmd.AddCommand(processCmd)
+	const DefaultSimilarityThreshold = 0.7
 
 	// Here you will define your flags and configuration settings.
 
@@ -82,7 +92,11 @@ func init() {
 	// is called directly, e.g.:
 	// processCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
 
-	scorePrefix = processCmd.Flags().StringP("score_prefix", "p", "",
+	externalComparisonPgm = processCmd.Flags().StringP("external_comparison_tool", "x", "",
+		"External image comparison tool")
+	similarityThreshold = processCmd.Flags().Float32P("similarity_threshold", "", DefaultSimilarityThreshold,
+		"Lowest similarity score for images to be considered a match")
+	scorePrefix = processCmd.Flags().StringP("score_prefix", "", "",
 		"Prefix to use for score data")
 	dontCluster = processCmd.Flags().BoolP("no_cluster", "",
 		false, "Do not cluster matches")

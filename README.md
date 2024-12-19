@@ -30,6 +30,19 @@ vidsim -d .my.cache.dir process <dir1> <dir2> ...
 
 ## Controlling the matching logic
 
+### Using external program for comparison
+
+By default `vidsim` uses the [images4](https://github.com/vitali-fedulov/images4) library. One can instead use any external program of choice by passing it to `vidsim` using `--external_comparison_tool` (or `-x`) option. The program is expected to adhere to the following protocol:
+
+- Take two image files as command line parameters.
+- Upon normal completion terminate with exit code 0.
+- The result of the program execution is a comparison score which the program should output to `stdout`.
+- The score is a floating point number between `0` and `1`, where `0` means that the two images don't match at all and `1` means that they match fully.
+
+### Similarity threshold
+
+Both internal logic and external comparison programs are expected to return a _comparison score_ for a pair of images which is a floating point value between `0` (images don't match at all) and `1` (images math fully). Similarity threshold is the lowest score value at which two images are considered a match. By default it is `0.7` but it can be customized via `--similarity_threshold` option.
+
 ### Clustering matches
 
 By default `vidsim` clusters matches. If files `A` and `B` match and later files `B` and `C` match, all 3 files will be grouped together. When match parameters are really sensitive (generating a lot of false positives while reducing false negatives) this behavior might result in very large clusters of many false positives. One might disable such clustering using the option `--no_cluster` which will make each pair treated as a separate match.

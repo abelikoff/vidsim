@@ -18,21 +18,24 @@ import (
 const (
 	DefaultChrominanceTolerance = 0.3
 	DefaultProportionTolerance  = 10.0
+	DefaultSimilarityThreshold  = 0.7
 )
 
 type Processor struct {
-	numWorkers   int           // number of workers
-	frames       []int         // list of all frame IDs we will be processing
-	groups       map[int][]int // bucket -> list of frame IDs
-	state        *state.State
-	stats        StatsCollector
-	logger       *logrus.Logger
-	frameBuckets map[int]int    // frameID -> bucket
-	nextBucket   int            // next bucket number
-	exclusionRx  *regexp.Regexp // exclude files matching pattern
-	bucketMutex  sync.Mutex
-	QuietMode    bool          // be really quiet (only show warnings and errors)
-	OutputWriter *bufio.Writer // where to write the report (nil means stdout)
+	numWorkers             int           // number of workers
+	frames                 []int         // list of all frame IDs we will be processing
+	groups                 map[int][]int // bucket -> list of frame IDs
+	state                  *state.State
+	stats                  StatsCollector
+	logger                 *logrus.Logger
+	frameBuckets           map[int]int    // frameID -> bucket
+	nextBucket             int            // next bucket number
+	exclusionRx            *regexp.Regexp // exclude files matching pattern
+	bucketMutex            sync.Mutex
+	QuietMode              bool          // be really quiet (only show warnings and errors)
+	ExternalComparisonTool string        // Program to use for image comparison
+	OutputWriter           *bufio.Writer // where to write the report (nil means stdout)
+	SimilarityThreshold    float32       // images with similarity score above the threshold are considered a match
 
 	ScorePrefix          string // Prefix to use for score records
 	UseAbsolutePaths     bool   // When true filenames will be stored in the state with absolute paths
@@ -60,6 +63,7 @@ func MakeProcessor(numWorkers int, stateDirectory string, logger *logrus.Logger)
 	proc.nextBucket = 1
 	proc.ChrTolerance = DefaultChrominanceTolerance
 	proc.PropTolerance = DefaultProportionTolerance
+	proc.SimilarityThreshold = DefaultSimilarityThreshold
 
 	proc.bucketMutex = sync.Mutex{}
 	err := proc.state.Init(stateDirectory, logger, proc.ScorePrefix)

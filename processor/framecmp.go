@@ -3,14 +3,6 @@ package processor
 import (
 	"fmt"
 	"sync"
-
-	"github.com/vitali-fedulov/images4"
-)
-
-const (
-	ScoreSimilar        float32 = 0.001 // score to assign for similar images
-	ScoreDifferent      float32 = 1.0   // score to assign for different images
-	SimilarityThreshold float32 = 0.5   // maximum score for similar images
 )
 
 type fcmpRequest struct {
@@ -124,40 +116,11 @@ func (proc *Processor) fcmpWorker(workerID int, requestQueue chan fcmpRequest, r
 	}
 }
 
-func (proc *Processor) compareImageFiles(imageFile1 string, imageFile2 string) (float32, error) {
-	img1, err := images4.Open(imageFile1)
-
-	if err != nil {
-		proc.logger.Errorf("Failed to open image file %s: %v", imageFile1, err)
-		return 0, err
-	}
-
-	img2, err := images4.Open(imageFile2)
-
-	if err != nil {
-		proc.logger.Errorf("Failed to open image file %s: %v", imageFile2, err)
-		return 0, err
-	}
-
-	// Icons are compact hash-like image representations.
-
-	icon1 := images4.Icon(img1)
-	icon2 := images4.Icon(img2)
-
-	if images4.CustomSimilar(icon1, icon2,
-		images4.CustomCoefficients{Y: proc.ChrTolerance, Cb: proc.ChrTolerance, Cr: proc.ChrTolerance, Prop: proc.PropTolerance}) {
-		proc.logger.Debugf("SIMILAR: %s and %s", imageFile1, imageFile2)
-		return ScoreSimilar, nil
-	}
-
-	return ScoreDifferent, nil
-}
-
 func (proc *Processor) bucketResults(frameID1, frameID2 int, score float32) {
 	if proc.isFalsePositive(score) {
 		proc.logger.Debugf("false positive: frames %d and %d\n", frameID1, frameID2)
 		proc.stats.NumFalsePositives++
-	} else if score <= SimilarityThreshold {
+	} else if score >= proc.SimilarityThreshold {
 
 		// determine the bucket to assign frames to
 
