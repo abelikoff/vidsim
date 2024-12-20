@@ -23,6 +23,7 @@ safety protection against such case).
 		logger := MakeLogger()
 		nWorkers := 1
 		proc := processor.MakeProcessor(nWorkers, *stateDirectory, logger)
+		proc.ScorePrefix = *scorePrefix
 		proc.ChrTolerance = *chromTolerance
 		proc.PropTolerance = *propTolerance
 		proc.QuietMode = *quietMode

@@ -25,6 +25,7 @@ var numWorkers *int        // number of parallel workers to use
 var excludePattern *string // pattern to exclude matching files
 var stateDirectory *string // location of persistent state
 var outputFile *string     // where to output the report
+var scorePrefix *string    // Prefix to use for score records
 var verboseMode *bool
 var debugMode *bool
 var quietMode *bool
@@ -48,6 +49,8 @@ func init() {
 		"number of parallel workers")
 	stateDirectory = rootCmd.PersistentFlags().StringP("state_directory", "d", "",
 		"directory to store/use the state")
+	scorePrefix = processCmd.Flags().StringP("score_prefix", "", "",
+		"Prefix to use for score data")
 	outputFile = rootCmd.PersistentFlags().StringP("output_file", "o", "",
 		"file to output the report to")
 	excludePattern = rootCmd.PersistentFlags().StringP("exclude", "X", "",

@@ -14,7 +14,6 @@ import (
 
 var externalComparisonPgm *string // External program for image comparison
 var similarityThreshold *float32  // Custom similarity threshold
-var scorePrefix *string           // Prefix to use for score records
 var chromTolerance *float64       // Chrominance tolerance flag
 var propTolerance *float64        // Proportion tolerance flag
 var useAbsolutePaths *bool        // Whether to store filenames with absolute paths
@@ -96,8 +95,6 @@ func init() {
 		"External image comparison tool")
 	similarityThreshold = processCmd.Flags().Float32P("similarity_threshold", "", DefaultSimilarityThreshold,
 		"Lowest similarity score for images to be considered a match")
-	scorePrefix = processCmd.Flags().StringP("score_prefix", "", "",
-		"Prefix to use for score data")
 	dontCluster = processCmd.Flags().BoolP("no_cluster", "",
 		false, "Do not cluster matches")
 	useAbsolutePaths = processCmd.Flags().BoolP("abs_paths", "A",
