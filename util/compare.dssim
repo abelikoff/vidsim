@@ -1,0 +1,6 @@
+#!/bin/bash
+
+# Utility script for comparing two images using dssim (https://github.com/kornelski/dssim)
+# from within vidsim
+
+dssim "$1" "$2" | awk '{printf("%.4f\n", 1.0 - $1);}'

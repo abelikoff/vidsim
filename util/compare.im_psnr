@@ -1,0 +1,7 @@
+#!/bin/bash
+
+# Utility script for comparing two images using ImageMagick's compare w/ PSNR score
+# from within vidsim.
+
+out=$(compare -metric PSNR "$1" "$2" /dev/null 2>&1 | sed -e 's/.*(//' -e 's/).*//')
+bc -l <<< "scale=4; 1.0 - $out"

@@ -1,0 +1,12 @@
+#!/bin/bash
+
+# Utility script for comparing two images using perceptualdiff
+# from within vidsim.
+
+out=$(perceptualdiff --sum-errors --scale "$1" "$2" | awk '/normal/ {print $1/10.0}')
+
+if [[ -z $out ]]; then
+    out=0.0000
+fi
+
+echo $out
