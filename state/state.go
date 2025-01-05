@@ -91,7 +91,7 @@ func (state *State) Init(stateDirectory string, logger *logrus.Logger, scorePref
 		}
 
 		state.nextframeID = maxID + 1
-		state.logger.Debugf("Next frame ID: %d", maxID)
+		state.logger.Debugf("Next frame ID: %d", state.nextframeID)
 	}
 
 	return nil
