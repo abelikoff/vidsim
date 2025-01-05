@@ -203,8 +203,24 @@ func (proc *Processor) generateFrameAtOffset(path string, frameFile string, offs
 
 func (proc *Processor) isEligibleFile(path string) bool {
 	videoExtensions := map[string]bool{
-		".mp4": true, ".mov": true, ".avi": true, ".mkv": true, ".wmv": true,
-		".flv": true, ".webm": true, ".ogg": true, ".ogv": true, // Add more as needed
+		".3gp":  true,
+		".asf":  true,
+		".avi":  true,
+		".divx": true,
+		".flv":  true,
+		".m2t":  true,
+		".m4v":  true,
+		".mkv":  true,
+		".mov":  true,
+		".mp4":  true,
+		".mpeg": true,
+		".mpg":  true,
+		".ogg":  true,
+		".ogv":  true,
+		".rmvb": true,
+		".webm": true,
+		".wmv":  true,
+		".xvid": true,
 	}
 
 	ext := strings.ToLower(filepath.Ext(path))
