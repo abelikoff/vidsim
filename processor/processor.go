@@ -201,8 +201,10 @@ func (proc *Processor) countVideoFiles(directories []string) int {
 }
 
 func (proc *Processor) newBucket() int {
+	proc.bucketMutex.Lock()
 	bucket := proc.nextBucket
 	proc.nextBucket++
+	proc.bucketMutex.Unlock()
 	return bucket
 }
 

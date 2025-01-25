@@ -117,37 +117,68 @@ func (proc *Processor) fcmpWorker(workerID int, requestQueue chan fcmpRequest, r
 }
 
 func (proc *Processor) bucketResults(frameID1, frameID2 int, score float32) {
+	if frameID1 > frameID2 {
+		frameID1, frameID2 = frameID2, frameID1
+	}
+
 	if proc.isFalsePositive(score) {
-		proc.logger.Debugf("false positive: frames %d and %d\n", frameID1, frameID2)
+		proc.logger.Debugf("Frames %d and %d => false positive", frameID1, frameID2)
 		proc.stats.NumFalsePositives++
+
 	} else if score >= proc.SimilarityThreshold {
+
+		proc.stats.NumMatches++
+		proc.logger.Debugf("Bucketing frames %d and %d", frameID1, frameID2)
 
 		// determine the bucket to assign frames to
 
-		var resultingBucket int
+		var resultingBucket = -1 // bucket to which both frames will be assigned
 
-		// Make clusters more deterministic by always preferring the bucket associated with the
-		// frameID with a smaller number.
+		if !proc.DontCluster {
+			if bucket, found := proc.frameBuckets[frameID1]; found {
+				proc.logger.Debugf("Frame %d is already in a bucket %d", frameID1, bucket)
+				resultingBucket = bucket
+			}
 
-		if frameID1 > frameID2 {
-			frameID1, frameID2 = frameID2, frameID1
+			if bucket, found := proc.frameBuckets[frameID2]; found {
+				proc.logger.Debugf("Frame %d is already in a bucket %d", frameID2, bucket)
+
+				if resultingBucket >= 0 {
+					proc.logger.Debugf("Merging to bucket %d -> bucket %d", bucket, resultingBucket)
+					proc.mergeBuckets(bucket, resultingBucket)
+					return
+				}
+
+				resultingBucket = bucket
+			}
 		}
 
-		if proc.DontCluster {
+		if proc.DontCluster || resultingBucket < 0 {
 			resultingBucket = proc.newBucket()
-		} else if bucket, found := proc.frameBuckets[frameID1]; found {
-			resultingBucket = bucket
-		} else if bucket, found := proc.frameBuckets[frameID2]; found {
-			resultingBucket = bucket
-		} else {
-			resultingBucket = proc.newBucket()
+			proc.logger.Debugf("Creating new bucket: %d", resultingBucket)
 		}
 
+		proc.logger.Debugf("Bucketed: frames %d and %d => %d", frameID1, frameID2, resultingBucket)
 		proc.bucketMutex.Lock()
 		proc.frameBuckets[frameID1] = resultingBucket
 		proc.frameBuckets[frameID2] = resultingBucket
-		proc.stats.NumMatches++
 		proc.bucketMutex.Unlock()
+	} else {
+		proc.logger.Debugf("Frames %d and %d are below threshold (%f)", frameID1, frameID2, score)
+	}
+}
+
+// Reassign all mappings to bucketFrom to bucket bucketTo
+
+func (proc *Processor) mergeBuckets(bucketFrom, bucketTo int) {
+	if bucketFrom == bucketTo {
+		return
+	}
+
+	for frameID, bucket := range proc.frameBuckets {
+		if bucket == bucketFrom {
+			proc.frameBuckets[frameID] = bucketTo
+		}
 	}
 }
 
