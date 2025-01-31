@@ -165,22 +165,31 @@ func (proc *Processor) generateFrame(path string, frameFile string) error {
 func (proc *Processor) generateFrameAtOffset(path string, frameFile string, offset string) error {
 	proc.logger.Debugf("Generating frame at offset %s: %s -> %s", offset, path, frameFile)
 
-	program := "ffmpeg"
-	args := []string{
-		"-loglevel",
-		"quiet",
-		"-y",
-		"-ss",
-		offset,
-		"-i",
-		path,
-		"-frames:v",
-		"1",
-		"-q:v",
-		"2",
-		"-s",
-		"400x400",
-		frameFile}
+	var args []string
+	var program string
+
+	if proc.ExternalFramegenTool != "" {
+		program = proc.ExternalFramegenTool
+		args = []string{path, frameFile, offset}
+	} else {
+		program = "ffmpeg"
+		args = []string{
+			"-loglevel",
+			"quiet",
+			"-y",
+			"-ss",
+			offset,
+			"-i",
+			path,
+			"-frames:v",
+			"1",
+			"-q:v",
+			"2",
+			"-s",
+			"400x400",
+			frameFile}
+	}
+
 	cmd := exec.Command(program, args...)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
@@ -188,10 +197,10 @@ func (proc *Processor) generateFrameAtOffset(path string, frameFile string, offs
 
 	if err != nil {
 		if exitError, ok := err.(*exec.ExitError); ok {
-			return fmt.Errorf("ffmpeg failed (%d)", exitError.ExitCode())
+			return fmt.Errorf("frame generation failed (%d)", exitError.ExitCode())
 		}
 
-		return errors.New("failed to run ffmpeg")
+		return errors.New("failed to run frame generator")
 	}
 
 	if _, err = os.Stat(frameFile); err != nil {

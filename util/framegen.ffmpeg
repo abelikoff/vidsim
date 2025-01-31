@@ -1,0 +1,15 @@
+#!/bin/bash
+
+# Utility script for generating an image frame out of the video file.
+
+if [[ $# -ne 3 ]]; then
+    echo "Usage: $(basename $0)  <video_file>  <frame_file>  <offset>" >&2
+    exit 1
+fi
+
+readonly video_file="$1"
+readonly frame_file="$2"
+readonly offset="$3"
+
+exec ffmpeg -hide_banner -loglevel quiet -y -ss "$offset" -i "$video_file" -vf "format=gray" -frames:v 1 -q:v 2 -s 500x500 "$frame_file"
+exit 1

@@ -12,6 +12,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
+var externalFramegenPgm *string   // External program for frame generation
 var externalComparisonPgm *string // External program for image comparison
 var similarityThreshold *float32  // Custom similarity threshold
 var chromTolerance *float64       // Chrominance tolerance flag
@@ -44,6 +45,7 @@ it consideres similar. The report is output in JSON format.
 		proc.IgnoreFalsePositives = *ignoreFalsePositives
 		proc.DontCluster = *dontCluster
 		proc.ScorePrefix = *scorePrefix
+		proc.ExternalFramegenTool = *externalFramegenPgm
 		proc.ExternalComparisonTool = *externalComparisonPgm
 
 		if *similarityThreshold < 0 || *similarityThreshold > 1 {
@@ -91,13 +93,15 @@ func init() {
 	// is called directly, e.g.:
 	// processCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
 
-	externalComparisonPgm = processCmd.Flags().StringP("external_comparison_tool", "x", "",
+	externalFramegenPgm = processCmd.Flags().StringP("framegen_tool", "G", "",
+		"External frame generation tool")
+	externalComparisonPgm = processCmd.Flags().StringP("comparison_tool", "C", "",
 		"External image comparison tool")
-	similarityThreshold = processCmd.Flags().Float32P("similarity_threshold", "", DefaultSimilarityThreshold,
+	similarityThreshold = processCmd.Flags().Float32P("similarity_threshold", "T", DefaultSimilarityThreshold,
 		"Lowest similarity score for images to be considered a match")
 	dontCluster = processCmd.Flags().BoolP("no_cluster", "",
 		false, "Do not cluster matches")
-	useAbsolutePaths = processCmd.Flags().BoolP("abs_paths", "A",
+	useAbsolutePaths = processCmd.Flags().BoolP("abs_paths", "",
 		false, "Store filenames with absolute paths")
 	ignoreFalsePositives = processCmd.Flags().BoolP("ignore_false_positives", "",
 		false, "Treat false positives as matches")

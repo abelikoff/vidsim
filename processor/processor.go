@@ -33,6 +33,7 @@ type Processor struct {
 	exclusionRx            *regexp.Regexp // exclude files matching pattern
 	bucketMutex            sync.Mutex
 	QuietMode              bool          // be really quiet (only show warnings and errors)
+	ExternalFramegenTool   string        // Program to use for frame generation
 	ExternalComparisonTool string        // Program to use for image comparison
 	OutputWriter           *bufio.Writer // where to write the report (nil means stdout)
 	SimilarityThreshold    float32       // images with similarity score above the threshold are considered a match

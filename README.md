@@ -28,11 +28,21 @@ Since frame extraction and comparison are relatively slow and expensive, `vidsim
 vidsim -d .my.cache.dir process <dir1> <dir2> ...
 ```
 
+## Controlling frame generation
+
+By default `vidsim` calls `ffmpeg` to extract a single image frame from each video file. This behavior can be cusomized by specifying another external program or script via `-G` option. Such program is passed 3 command line arguments:
+
+- A video file to extract the frame from.
+- Name of the output frame file.
+- A time offset (in format _MM:SS_) at which to extract.
+
+Upon normal completion terminate the program should exit with code 0.
+
 ## Controlling the matching logic
 
 ### Using external program for comparison
 
-By default `vidsim` uses the [images4](https://github.com/vitali-fedulov/images4) library. One can instead use any external program of choice by passing it to `vidsim` using `--external_comparison_tool` (or `-x`) option. The program is expected to adhere to the following protocol:
+By default `vidsim` uses the [images4](https://github.com/vitali-fedulov/images4) library. One can instead use any external program of choice by passing it to `vidsim` using `--external_comparison_tool` (or `-C`) option. The program is expected to adhere to the following protocol:
 
 - Take two image files as command line parameters.
 - Upon normal completion terminate with exit code 0.
