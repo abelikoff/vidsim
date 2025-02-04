@@ -126,7 +126,6 @@ func (proc *Processor) bucketResults(frameID1, frameID2 int, score float32) {
 		proc.stats.NumFalsePositives++
 
 	} else if score >= proc.SimilarityThreshold {
-
 		proc.stats.NumMatches++
 		proc.logger.Debugf("Bucketing frames %d and %d", frameID1, frameID2)
 
@@ -143,8 +142,12 @@ func (proc *Processor) bucketResults(frameID1, frameID2 int, score float32) {
 			if bucket, found := proc.frameBuckets[frameID2]; found {
 				proc.logger.Debugf("Frame %d is already in a bucket %d", frameID2, bucket)
 
+				if bucket == resultingBucket { // both frames are already in the same bucket,
+					return
+				}
+
 				if resultingBucket >= 0 {
-					proc.logger.Debugf("Merging to bucket %d -> bucket %d", bucket, resultingBucket)
+					proc.logger.Debugf("Merging bucket %d -> bucket %d", bucket, resultingBucket)
 					proc.mergeBuckets(bucket, resultingBucket)
 					return
 				}

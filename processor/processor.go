@@ -94,6 +94,10 @@ func (proc *Processor) Process(directories []string) error {
 		proc.logger.Fatal("No directories passed")
 	}
 
+	if proc.DontCluster {
+		proc.logger.Info("Match clustering is disabled")
+	}
+
 	proc.stats.QuietMode = proc.QuietMode
 	canProceed := true
 
@@ -211,5 +215,12 @@ func (proc *Processor) newBucket() int {
 
 func (proc *Processor) DebugDump() {
 	proc.state.DebugDump()
-	proc.logger.Debugf("--- groups ---------------------------\n%v\n", proc.groups)
+
+	for frameID, bucket := range proc.frameBuckets {
+		proc.logger.Debugf("Frame %d -> Bucket %d", frameID, bucket)
+	}
+
+	for bucket, frames := range proc.groups {
+		proc.logger.Debugf("Bucket %d -> Frames %v\n", bucket, frames)
+	}
 }
