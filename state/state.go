@@ -232,7 +232,7 @@ func (state *State) UnmatchFrames(frameID1, frameID2 int, falsePositive bool) {
 }
 
 func (state *State) DebugDump() {
-	state.logger.Debugf("--- scores ------------------\n%v\n", state.matchScores)
+	//state.logger.Debugf("--- scores ------------------\n%v\n", state.matchScores)
 }
 
 // ************************** Persistence methods ***********************************

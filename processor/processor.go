@@ -215,12 +215,15 @@ func (proc *Processor) newBucket() int {
 
 func (proc *Processor) DebugDump() {
 	proc.state.DebugDump()
+	proc.logger.Debug("=== Frame buckets ===")
 
 	for frameID, bucket := range proc.frameBuckets {
 		proc.logger.Debugf("Frame %d -> Bucket %d", frameID, bucket)
 	}
 
+	proc.logger.Debug("=== Match groups ===")
+
 	for bucket, frames := range proc.groups {
-		proc.logger.Debugf("Bucket %d -> Frames %v\n", bucket, frames)
+		proc.logger.Debugf("Bucket %d -> Frames %v", bucket, frames)
 	}
 }
