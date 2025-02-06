@@ -47,11 +47,6 @@ func (proc *Processor) compareFrames() error {
 	}()
 	proc.processComparisonResults(responseQueue)
 	proc.logger.Debugf("Done comparing frames")
-
-	for frameID, bucket := range proc.frameBuckets {
-		proc.groups[bucket] = append(proc.groups[bucket], frameID)
-	}
-
 	return nil
 }
 
@@ -127,62 +122,12 @@ func (proc *Processor) bucketResults(frameID1, frameID2 int, score float32) {
 
 	} else if score >= proc.SimilarityThreshold {
 		proc.logger.Debugf("Bucketing frames %d and %d", frameID1, frameID2)
-
-		// determine the bucket to assign frames to
-
-		var resultingBucket = -1 // bucket to which both frames will be assigned
-
-		if !proc.DontCluster {
-			if bucket, found := proc.frameBuckets[frameID1]; found {
-				proc.logger.Debugf("Frame %d is already in a bucket %d", frameID1, bucket)
-				resultingBucket = bucket
-			}
-
-			if bucket, found := proc.frameBuckets[frameID2]; found {
-				proc.logger.Debugf("Frame %d is already in a bucket %d", frameID2, bucket)
-
-				if bucket == resultingBucket { // both frames are already in the same bucket,
-					return
-				}
-
-				if resultingBucket >= 0 {
-					proc.logger.Debugf("Merging bucket %d -> bucket %d", bucket, resultingBucket)
-					proc.mergeBuckets(bucket, resultingBucket)
-					proc.stats.NumMatches++
-					return
-				}
-
-				resultingBucket = bucket
-			}
-		}
-
-		if proc.DontCluster || resultingBucket < 0 {
-			resultingBucket = proc.newBucket()
-			proc.logger.Debugf("Creating new bucket: %d", resultingBucket)
-		}
-
-		proc.logger.Debugf("Bucketed: frames %d and %d => %d", frameID1, frameID2, resultingBucket)
 		proc.bucketMutex.Lock()
-		proc.frameBuckets[frameID1] = resultingBucket
-		proc.frameBuckets[frameID2] = resultingBucket
+		proc.clusterer.AddMatch(frameID1, frameID2)
 		proc.bucketMutex.Unlock()
 		proc.stats.NumMatches++
 	} else {
 		proc.logger.Debugf("Frames %d and %d are below threshold (%f)", frameID1, frameID2, score)
-	}
-}
-
-// Reassign all mappings to bucketFrom to bucket bucketTo
-
-func (proc *Processor) mergeBuckets(bucketFrom, bucketTo int) {
-	if bucketFrom == bucketTo {
-		return
-	}
-
-	for frameID, bucket := range proc.frameBuckets {
-		if bucket == bucketFrom {
-			proc.frameBuckets[frameID] = bucketTo
-		}
 	}
 }
 

@@ -8,6 +8,7 @@ import (
 	"os"
 
 	"github.com/abelikoff/vidsim/processor"
+	"github.com/abelikoff/vidsim/state"
 	"github.com/spf13/cobra"
 )
 
@@ -18,7 +19,7 @@ var dumpCmd = &cobra.Command{
 	Run: func(_ *cobra.Command, args []string) {
 		logger := MakeLogger()
 		nWorkers := 1
-		proc := processor.MakeProcessor(nWorkers, *stateDirectory, logger)
+		proc := processor.MakeProcessor(nWorkers, *stateDirectory, state.None, logger)
 
 		if *outputFile != "" {
 			f, err := os.Create(*outputFile)

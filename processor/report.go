@@ -21,8 +21,8 @@ func (proc *Processor) GenerateReport() {
 
 	empty := true
 
-	for _, frames := range proc.groups {
-		if len(frames) < 2 {
+	for _, group := range proc.clusterer.Groups() {
+		if len(group) < 2 {
 			continue
 		}
 
@@ -36,19 +36,21 @@ func (proc *Processor) GenerateReport() {
 
 	fmt.Fprint(writer, "[")
 	bucketsep := "\n  "
+	bucket := 0
 
-	for bucket, frames := range proc.groups {
-		if len(frames) < 2 {
+	for _, group := range proc.clusterer.Groups() {
+		if len(group) < 2 {
 			continue
 		}
 
+		bucket++
 		fmt.Fprintf(writer, "%s{\n    \"bucket\": %d,\n    \"files\": [\n", bucketsep, bucket)
 		bucketsep = ",\n  "
 
-		for ii, frameID := range frames {
+		for ii, frameID := range group {
 			filesep := ","
 
-			if ii == len(frames)-1 {
+			if ii == len(group)-1 {
 				filesep = ""
 			}
 

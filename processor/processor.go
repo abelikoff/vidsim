@@ -22,15 +22,13 @@ const (
 )
 
 type Processor struct {
-	numWorkers             int           // number of workers
-	frames                 []int         // list of all frame IDs we will be processing
-	groups                 map[int][]int // bucket -> list of frame IDs
+	numWorkers             int   // number of workers
+	frames                 []int // list of all frame IDs we will be processing
 	state                  *state.State
 	stats                  StatsCollector
 	logger                 *logrus.Logger
-	frameBuckets           map[int]int    // frameID -> bucket
-	nextBucket             int            // next bucket number
-	exclusionRx            *regexp.Regexp // exclude files matching pattern
+	clusterer              state.Clusterer // responsible for clustering the matches
+	exclusionRx            *regexp.Regexp  // exclude files matching pattern
 	bucketMutex            sync.Mutex
 	QuietMode              bool          // be really quiet (only show warnings and errors)
 	ExternalFramegenTool   string        // Program to use for frame generation
@@ -41,7 +39,6 @@ type Processor struct {
 	ScorePrefix          string // Prefix to use for score records
 	UseAbsolutePaths     bool   // When true filenames will be stored in the state with absolute paths
 	IgnoreFalsePositives bool   // Treat false positives as matches
-	DontCluster          bool   // Do not cluster multiple matches together
 
 	// These two parameters govern the image comparison.
 	// See https://pkg.go.dev/github.com/vitali-fedulov/images4@v1.3.1#CustomCoefficients for more details.
@@ -52,7 +49,7 @@ type Processor struct {
 	PropTolerance float64 // proportion tolerance
 }
 
-func MakeProcessor(numWorkers int, stateDirectory string, logger *logrus.Logger) *Processor {
+func MakeProcessor(numWorkers int, stateDirectory string, clusteringMode state.ClusteringMethod, logger *logrus.Logger) *Processor {
 	if numWorkers < 1 || numWorkers > 64 {
 		logger.Fatalf("Bad number of workers: %d", numWorkers)
 	}
@@ -61,7 +58,6 @@ func MakeProcessor(numWorkers int, stateDirectory string, logger *logrus.Logger)
 	proc.numWorkers = numWorkers
 	proc.logger = logger
 	proc.state = state.MakeState()
-	proc.nextBucket = 1
 	proc.ChrTolerance = DefaultChrominanceTolerance
 	proc.PropTolerance = DefaultProportionTolerance
 	proc.SimilarityThreshold = DefaultSimilarityThreshold
@@ -73,9 +69,7 @@ func MakeProcessor(numWorkers int, stateDirectory string, logger *logrus.Logger)
 		logger.Fatalf("Failed to initialize state: %s", err)
 	}
 
-	proc.groups = make(map[int][]int)
-	proc.frameBuckets = make(map[int]int)
-
+	proc.clusterer = state.NewClusterer(clusteringMode)
 	return proc
 }
 
@@ -92,10 +86,6 @@ func (proc *Processor) SetExclusionPattern(pattern string) error {
 func (proc *Processor) Process(directories []string) error {
 	if len(directories) < 1 {
 		proc.logger.Fatal("No directories passed")
-	}
-
-	if proc.DontCluster {
-		proc.logger.Info("Match clustering is disabled")
 	}
 
 	proc.stats.QuietMode = proc.QuietMode
@@ -205,25 +195,8 @@ func (proc *Processor) countVideoFiles(directories []string) int {
 	return numFiles
 }
 
-func (proc *Processor) newBucket() int {
-	proc.bucketMutex.Lock()
-	bucket := proc.nextBucket
-	proc.nextBucket++
-	proc.bucketMutex.Unlock()
-	return bucket
-}
-
 func (proc *Processor) DebugDump() {
 	proc.state.DebugDump()
-	proc.logger.Debug("=== Frame buckets ===")
-
-	for frameID, bucket := range proc.frameBuckets {
-		proc.logger.Debugf("Frame %d -> Bucket %d", frameID, bucket)
-	}
-
-	proc.logger.Debug("=== Match groups ===")
-
-	for bucket, frames := range proc.groups {
-		proc.logger.Debugf("Bucket %d -> Frames %v", bucket, frames)
-	}
+	proc.logger.Debug("=== Frame mappings ===")
+	//TODO: proc.clusterer.DebugDump()
 }

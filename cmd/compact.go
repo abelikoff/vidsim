@@ -5,6 +5,7 @@ package cmd
 
 import (
 	"github.com/abelikoff/vidsim/processor"
+	"github.com/abelikoff/vidsim/state"
 	"github.com/spf13/cobra"
 )
 
@@ -22,7 +23,7 @@ safety protection against such case).
 	Run: func(_ *cobra.Command, args []string) {
 		logger := MakeLogger()
 		nWorkers := 1
-		proc := processor.MakeProcessor(nWorkers, *stateDirectory, logger)
+		proc := processor.MakeProcessor(nWorkers, *stateDirectory, state.None, logger)
 		proc.ScorePrefix = *scorePrefix
 		proc.ChrTolerance = *chromTolerance
 		proc.PropTolerance = *propTolerance

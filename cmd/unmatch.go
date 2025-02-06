@@ -7,6 +7,7 @@ import (
 	"runtime"
 
 	"github.com/abelikoff/vidsim/processor"
+	"github.com/abelikoff/vidsim/state"
 	"github.com/spf13/cobra"
 )
 
@@ -28,7 +29,7 @@ This command only works with persistent state.`,
 		}
 
 		logger.Infof("Running with %d parallel workers", nWorkers)
-		proc := processor.MakeProcessor(nWorkers, *stateDirectory, logger)
+		proc := processor.MakeProcessor(nWorkers, *stateDirectory, state.None, logger)
 		err := proc.Unmatch(args)
 
 		if err != nil {
