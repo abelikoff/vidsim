@@ -160,24 +160,6 @@ func (clr *StrictClusterer) AddMatch(frameID1 int, frameID2 int) {
 // Return the list of created groups
 
 func (clr *StrictClusterer) Groups() [][]int {
-	fmt.Println("All Matches:")
-	for frameID1, frameIDs := range clr.allMatches {
-		fmt.Printf("%d: ", frameID1)
-		for frameID2 := range frameIDs {
-			fmt.Printf("%d ", frameID2)
-		}
-		fmt.Println()
-	}
-
-	fmt.Println("Groups:")
-	for groupID, group := range clr.groups {
-		fmt.Printf("Group %d: ", groupID)
-		for _, frameID := range group {
-			fmt.Printf("%d ", frameID)
-		}
-		fmt.Println()
-	}
-
 	groups := make([][]int, 0, len(clr.groups))
 
 	for _, group := range clr.groups {

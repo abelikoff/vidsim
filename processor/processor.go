@@ -39,6 +39,7 @@ type Processor struct {
 	ScorePrefix          string // Prefix to use for score records
 	UseAbsolutePaths     bool   // When true filenames will be stored in the state with absolute paths
 	IgnoreFalsePositives bool   // Treat false positives as matches
+	DebugMode            bool   // Enable debug mode
 
 	// These two parameters govern the image comparison.
 	// See https://pkg.go.dev/github.com/vitali-fedulov/images4@v1.3.1#CustomCoefficients for more details.
@@ -196,6 +197,10 @@ func (proc *Processor) countVideoFiles(directories []string) int {
 }
 
 func (proc *Processor) DebugDump() {
+	if !proc.DebugMode {
+		return
+	}
+
 	proc.state.DebugDump()
 	proc.logger.Debug("=== Frame mappings ===")
 	proc.clusterer.DebugDump(bufio.NewWriter(os.Stdout))

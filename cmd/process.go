@@ -64,6 +64,7 @@ it consideres similar. The report is output in JSON format.
 		proc.ScorePrefix = *scorePrefix
 		proc.ExternalFramegenTool = *externalFramegenPgm
 		proc.ExternalComparisonTool = *externalComparisonPgm
+		proc.DebugMode = *debugMode
 
 		if *similarityThreshold < 0 || *similarityThreshold > 1 {
 			logger.Fatalf("Bad similarity threshold: %f", *similarityThreshold)
