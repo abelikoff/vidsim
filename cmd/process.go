@@ -110,7 +110,7 @@ func init() {
 	// is called directly, e.g.:
 	// processCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
 
-	clusteringMode = processCmd.Flags().StringP("cluster", "", "strict",
+	clusteringMode = processCmd.Flags().StringP("clustering_mode", "m", "strict",
 		"Clustering mode (none, union, strict [default])")
 	externalFramegenPgm = processCmd.Flags().StringP("framegen_tool", "G", "",
 		"External frame generation tool")

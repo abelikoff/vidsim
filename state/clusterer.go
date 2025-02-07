@@ -1,5 +1,10 @@
 package state
 
+import (
+	"bufio"
+	"fmt"
+)
+
 type ClusteringMethod int
 
 const (
@@ -14,6 +19,7 @@ const (
 type Clusterer interface {
 	AddMatch(frameID1 int, frameID2 int) // Add a pair of matched frames
 	Groups() [][]int                     // Return the list of created groups
+	DebugDump(writer *bufio.Writer)      // Dump the state
 }
 
 // Create a clusterer based on the selected clustering method
@@ -85,6 +91,20 @@ func (clr *TrivialClusterer) Groups() [][]int {
 	return groups
 }
 
+// Dump the state
+
+func (clr *TrivialClusterer) DebugDump(writer *bufio.Writer) {
+	fmt.Fprintln(writer, "=== Trivial Clusterer ===============================")
+
+	for frameID1, frameIDs := range clr.matches {
+		for frameID2 := range frameIDs {
+			fmt.Fprintf(writer, "[%d, %d]\n", frameID1, frameID2)
+		}
+	}
+
+	fmt.Fprintln(writer, "=====================================================")
+}
+
 // =====================================================================================
 
 // Strict clusterer - only combine elements into a group if all elements match pairwise
@@ -122,7 +142,8 @@ func (clr *StrictClusterer) AddMatch(frameID1 int, frameID2 int) {
 
 	for groupID, group := range clr.groups {
 		if clr.frameMatchesGroup(frameID1, groupID) || clr.frameMatchesGroup(frameID2, groupID) {
-			clr.groups[groupID] = append(group, frameID1, frameID2)
+
+			clr.groups[groupID] = removeDuplicates(append(group, frameID1, frameID2))
 			foundMatches = true
 		}
 	}
@@ -139,6 +160,24 @@ func (clr *StrictClusterer) AddMatch(frameID1 int, frameID2 int) {
 // Return the list of created groups
 
 func (clr *StrictClusterer) Groups() [][]int {
+	fmt.Println("All Matches:")
+	for frameID1, frameIDs := range clr.allMatches {
+		fmt.Printf("%d: ", frameID1)
+		for frameID2 := range frameIDs {
+			fmt.Printf("%d ", frameID2)
+		}
+		fmt.Println()
+	}
+
+	fmt.Println("Groups:")
+	for groupID, group := range clr.groups {
+		fmt.Printf("Group %d: ", groupID)
+		for _, frameID := range group {
+			fmt.Printf("%d ", frameID)
+		}
+		fmt.Println()
+	}
+
 	groups := make([][]int, 0, len(clr.groups))
 
 	for _, group := range clr.groups {
@@ -146,6 +185,27 @@ func (clr *StrictClusterer) Groups() [][]int {
 	}
 
 	return groups
+}
+
+// Dump the state
+
+func (clr *StrictClusterer) DebugDump(writer *bufio.Writer) {
+	fmt.Fprintln(writer, "=== Strict Clusterer ===============================")
+	fmt.Fprintln(writer, "--- all matches ---")
+
+	for frameID1, frameIDs := range clr.allMatches {
+		for frameID2 := range frameIDs {
+			fmt.Fprintf(writer, "[%d, %d]\n", frameID1, frameID2)
+		}
+	}
+
+	fmt.Fprintln(writer, "--- groups ---")
+
+	for groupID, group := range clr.groups {
+		fmt.Fprintf(writer, "Group %d  ->  %v\n", groupID, group)
+	}
+
+	fmt.Fprintln(writer, "=====================================================")
 }
 
 // Check if a pair of frame IDs match
@@ -178,6 +238,20 @@ func (clr *StrictClusterer) frameMatchesGroup(frameID int, groupID int) bool {
 	}
 
 	return true
+}
+
+func removeDuplicates(array []int) []int {
+	seen := make(map[int]bool)
+	result := []int{}
+
+	for _, num := range array {
+		if !seen[num] {
+			seen[num] = true
+			result = append(result, num)
+		}
+	}
+
+	return result
 }
 
 // =====================================================================================
@@ -231,6 +305,7 @@ func (clr *UnionClusterer) AddMatch(frameID1 int, frameID2 int) {
 		}
 
 		clr.groups[group2] = append(clr.groups[group2], clr.groups[group1]...)
+		delete(clr.groups, group1)
 		return
 	}
 
@@ -263,4 +338,16 @@ func (clr *UnionClusterer) Groups() [][]int {
 	}
 
 	return groups
+}
+
+// Dump the state
+
+func (clr *UnionClusterer) DebugDump(writer *bufio.Writer) {
+	fmt.Fprintln(writer, "=== Union Clusterer ===============================")
+
+	for groupID, group := range clr.groups {
+		fmt.Fprintf(writer, "Group %d  ->  %v\n", groupID, group)
+	}
+
+	fmt.Fprintln(writer, "=====================================================")
 }

@@ -198,5 +198,5 @@ func (proc *Processor) countVideoFiles(directories []string) int {
 func (proc *Processor) DebugDump() {
 	proc.state.DebugDump()
 	proc.logger.Debug("=== Frame mappings ===")
-	//TODO: proc.clusterer.DebugDump()
+	proc.clusterer.DebugDump(bufio.NewWriter(os.Stdout))
 }
