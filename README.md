@@ -49,15 +49,23 @@ By default `vidsim` uses the [images4](https://github.com/vitali-fedulov/images4
 - The result of the program execution is a comparison score which the program should output to `stdout`.
 - The score is a floating point number between `0` and `1`, where `0` means that the two images don't match at all and `1` means that they match fully.
 
+## Controlling matching logic
+
 ### Similarity threshold
 
 Both internal logic and external comparison programs are expected to return a _comparison score_ for a pair of images which is a floating point value between `0` (images don't match at all) and `1` (images math fully). Similarity threshold is the lowest score value at which two images are considered a match. By default it is `0.7` but it can be customized via `--similarity_threshold` option.
 
-### Clustering matches
+## Match grouping logic
 
-By default `vidsim` clusters matches. If files `A` and `B` match and later files `B` and `C` match, all 3 files will be grouped together. When match parameters are really sensitive (generating a lot of false positives while reducing false negatives) this behavior might result in very large clusters of many false positives. One might disable such clustering using the option `--no_cluster` which will make each pair treated as a separate match.
+When `vidsim` computes pairwise matches of files, it can group matching videos based on different heuristics. This is controlled by `--clustering_mode` (or `-m`) parameter. Currently, `vidsim` offers 3 different heuristics:
 
-### Handle false positives
+- **Strict matching** (`-m strict`) - files are grouped as long as they all match in a pairwise fashion (this is the default behavior).
+
+- **Weak matching** (`-m union`) - assuming match property is transitive, files are groups as long as there is a transitive match between any two files (in other words, as long as `A ^ B, B ^ C, C ^ D` and so on, where `^` denotes the match property)
+
+- **No clustering** (`-m none`) - No grouping happens (each matching pair is reported separately).
+
+### Handling false positives
 
 Since the comparison logic is imprecise, the will inevitably false positive matches: videos identified as similar, which are not. Running the tool repeatedly and revisiting those false positives again and again is annoying and distracting. To address this, `vidsim` allows marking pairs of videos as false positive matches, so that when it runs next time, this pair of videos will not be reported as a match. Naturally, this is only supported with caching on.
 
@@ -107,8 +115,3 @@ By default `vidsim` saves filenames using relative (to the top directories speci
 -   When compacting the state, the command should be run _in the same directory where `process` command was run_, otherwise `vidsim` will not find the files listed in the state and will think those files have been deleted (it does have a sanity check agains mass deletion however).
 
 Alternatively, one can specify a `--abs_paths` option to make `vidsim` store absolute paths. This takes more space but it avoids the problem above.
-
-## Future work
-
--   Add a `peek` command to examine the cached data.
--   Display cache statistics during processing.
