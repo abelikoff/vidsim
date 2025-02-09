@@ -14,6 +14,7 @@ type StatsCollector struct {
 	NumFramesGenerated  int
 	NumTotalComparisons int
 	NumComparisonsMade  int
+	NumMismatches       int
 	NumCacheHits        int
 	NumMatches          int
 	NumFalsePositives   int
@@ -76,7 +77,7 @@ func (stats *StatsCollector) EstimateCompletionETA() (int, error) {
 	return int(eta), nil
 }
 
-func (stats *StatsCollector) ShowSummary() {
+func (stats *StatsCollector) ShowSummary() error {
 	var genPercentage, compPercentage int
 
 	if stats.NumFilesToProcess > 0 {
@@ -95,6 +96,7 @@ Video files:         %10d
 Frames generated:    %10d  (%d%%)
 Total comparisons:   %10d
 New comparisons:     %10d  (%d%%)
+Mismatches:          %10d
 Total matches:       %10d
 False positives:     %10d
 `,
@@ -104,6 +106,17 @@ False positives:     %10d
 		stats.NumTotalComparisons,
 		stats.NumTotalComparisons-stats.NumCacheHits,
 		compPercentage,
+		stats.NumMismatches,
 		stats.NumMatches,
 		stats.NumFalsePositives)
+
+	if stats.NumFilesToProcess*(stats.NumFilesToProcess-1)/2 != stats.NumTotalComparisons {
+		return errors.New("number of comparisons inconsistent with number of files")
+	}
+
+	if stats.NumMismatches+stats.NumMatches+stats.NumFalsePositives != stats.NumTotalComparisons {
+		return errors.New("number of comparisons inconsistent match statistics")
+	}
+
+	return nil
 }

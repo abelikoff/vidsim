@@ -128,6 +128,7 @@ func (proc *Processor) bucketResults(frameID1, frameID2 int, score float32) {
 		proc.stats.NumMatches++
 	} else {
 		proc.logger.Debugf("Frames %d and %d are below threshold (%f)", frameID1, frameID2, score)
+		proc.stats.NumMismatches++
 	}
 }
 

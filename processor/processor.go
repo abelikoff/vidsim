@@ -173,7 +173,9 @@ func (proc *Processor) DumpState() error {
 }
 
 func (proc *Processor) ShowSummary() {
-	proc.stats.ShowSummary()
+	if err := proc.stats.ShowSummary(); err != nil {
+		proc.logger.Errorf("inconsistent statistics: %s", err)
+	}
 }
 
 func (proc *Processor) countVideoFiles(directories []string) int {
