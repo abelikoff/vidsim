@@ -141,8 +141,7 @@ func (clr *StrictClusterer) AddMatch(frameID1 int, frameID2 int) {
 	foundMatches := false
 
 	for groupID, group := range clr.groups {
-		if clr.frameMatchesGroup(frameID1, groupID) || clr.frameMatchesGroup(frameID2, groupID) {
-
+		if clr.frameMatchesGroup(frameID1, groupID) && clr.frameMatchesGroup(frameID2, groupID) {
 			clr.groups[groupID] = removeDuplicates(append(group, frameID1, frameID2))
 			foundMatches = true
 		}
