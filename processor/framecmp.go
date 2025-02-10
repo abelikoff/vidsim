@@ -121,7 +121,7 @@ func (proc *Processor) bucketResults(frameID1, frameID2 int, score float32) {
 		proc.stats.NumFalsePositives++
 
 	} else if score >= proc.SimilarityThreshold {
-		proc.logger.Debugf("Bucketing frames %d and %d", frameID1, frameID2)
+		proc.logger.Debugf("Bucketing frames %d and %d (score: %.4f)", frameID1, frameID2, score)
 		proc.bucketMutex.Lock()
 		proc.clusterer.AddMatch(frameID1, frameID2)
 		proc.bucketMutex.Unlock()

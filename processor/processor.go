@@ -70,7 +70,7 @@ func MakeProcessor(numWorkers int, stateDirectory string, clusteringMode state.C
 		logger.Fatalf("Failed to initialize state: %s", err)
 	}
 
-	proc.clusterer = state.NewClusterer(clusteringMode)
+	proc.clusterer = state.NewClusterer(clusteringMode, logger)
 	return proc
 }
 
@@ -204,6 +204,5 @@ func (proc *Processor) DebugDump() {
 	}
 
 	proc.state.DebugDump()
-	proc.logger.Debug("=== Frame mappings ===")
-	proc.clusterer.DebugDump(bufio.NewWriter(os.Stdout))
+	proc.clusterer.DebugDump()
 }

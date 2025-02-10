@@ -206,7 +206,7 @@ func (state *State) GetComparisonScore(frameID1 int, frameID2 int) (float32, boo
 
 func (state *State) SetComparisonScore(frameID1 int, frameID2 int, score float32) {
 	if state.persistent {
-		state.setComparisonScorePersistent(frameID1, frameID2, score)
+		state.setComparisonScorePersistent(frameID1, frameID2, score, false)
 		return
 	}
 
@@ -228,7 +228,7 @@ func (state *State) UnmatchFrames(frameID1, frameID2 int, falsePositive bool) {
 		return
 	}
 
-	state.unmatchFramesPersistent(frameID1, frameID2, falsePositive)
+	state.setComparisonScorePersistent(frameID1, frameID2, 0, falsePositive)
 }
 
 func (state *State) DebugDump() {
@@ -427,9 +427,11 @@ func (state *State) setFileFrameIDPersistent(path string, frameID int) {
 	}
 }
 
-func (state *State) setComparisonScorePersistent(frameID1, frameID2 int, score float32) {
+func (state *State) setComparisonScorePersistent(frameID1, frameID2 int, score float32, isFalsePositive bool) {
+	state.logger.Debugf("saving score for %d, %d => %.4f (fp: %v)", frameID1, frameID2, score, isFalsePositive)
+
 	err := state.db.Update(func(txn *badger.Txn) error {
-		val, err := state.encodeScoreData(score, false)
+		val, err := state.encodeScoreData(score, isFalsePositive)
 
 		if err != nil {
 			return err
@@ -440,29 +442,6 @@ func (state *State) setComparisonScorePersistent(frameID1, frameID2 int, score f
 
 	if err != nil {
 		state.logger.Errorf("setComparisonScorePersistent(%d, %d): %s",
-			frameID1, frameID2, err)
-	}
-}
-
-func (state *State) unmatchFramesPersistent(frameID1, frameID2 int, falsePositive bool) {
-	err := state.db.Update(func(txn *badger.Txn) error {
-		state.logger.Debugf("Marking match for %d, %d as false positive", frameID1, frameID2)
-		key := state.encodeScoreKey(frameID1, frameID2)
-		item, err := txn.Get(key)
-
-		if err != nil {
-			return err
-		}
-
-		err = item.Value(func(val []byte) error {
-			val[4] = boolToByte(falsePositive) // Update only the IsValid byte
-			return txn.Set(key, val)
-		})
-		return err
-	})
-
-	if err != nil {
-		state.logger.Errorf("setScoreAsFalsePositivePersistent(%d, %d): %s",
 			frameID1, frameID2, err)
 	}
 }

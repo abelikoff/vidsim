@@ -1,8 +1,7 @@
 package state
 
 import (
-	"bufio"
-	"fmt"
+	"github.com/sirupsen/logrus"
 )
 
 type ClusteringMethod int
@@ -19,28 +18,31 @@ const (
 type Clusterer interface {
 	AddMatch(frameID1 int, frameID2 int) // Add a pair of matched frames
 	Groups() [][]int                     // Return the list of created groups
-	DebugDump(writer *bufio.Writer)      // Dump the state
+	DebugDump()                          // Dump the state
 }
 
 // Create a clusterer based on the selected clustering method
 
-func NewClusterer(method ClusteringMethod) Clusterer {
+func NewClusterer(method ClusteringMethod, logger *logrus.Logger) Clusterer {
 	switch method {
 	case None:
 		return &TrivialClusterer{
 			matches: make(map[int]map[int]struct{}),
+			logger:  logger,
 		}
 	case Strict:
 		return &StrictClusterer{
 			allMatches:  make(map[int]map[int]struct{}),
 			groups:      make(map[int][]int),
 			nextGroupID: 1,
+			logger:      logger,
 		}
 	case Loose:
 		return &UnionClusterer{
 			frame2group: make(map[int]int),
 			groups:      make(map[int][]int),
 			nextGroupID: 1,
+			logger:      logger,
 		}
 	}
 
@@ -53,6 +55,7 @@ func NewClusterer(method ClusteringMethod) Clusterer {
 
 type TrivialClusterer struct {
 	matches map[int]map[int]struct{} // A match between two frameIDs is encoded by matches[X][Y] being present.
+	logger  *logrus.Logger
 }
 
 // Add a pair of matched frames
@@ -93,16 +96,16 @@ func (clr *TrivialClusterer) Groups() [][]int {
 
 // Dump the state
 
-func (clr *TrivialClusterer) DebugDump(writer *bufio.Writer) {
-	fmt.Fprintln(writer, "=== Trivial Clusterer ===============================")
+func (clr *TrivialClusterer) DebugDump() {
+	clr.logger.Debug("=== Trivial Clusterer ===============================")
 
 	for frameID1, frameIDs := range clr.matches {
 		for frameID2 := range frameIDs {
-			fmt.Fprintf(writer, "[%d, %d]\n", frameID1, frameID2)
+			clr.logger.Debugf("[%d, %d]\n", frameID1, frameID2)
 		}
 	}
 
-	fmt.Fprintln(writer, "=====================================================")
+	clr.logger.Debugf("=====================================================")
 }
 
 // =====================================================================================
@@ -113,11 +116,14 @@ type StrictClusterer struct {
 	allMatches  map[int]map[int]struct{} // All matched pairs (encoded by matches[X][Y] being present).
 	groups      map[int][]int            // group ID -> list of frame IDs
 	nextGroupID int                      // next group ID to assign
+	logger      *logrus.Logger
 }
 
 // Add a pair of matched frames
 
 func (clr *StrictClusterer) AddMatch(frameID1 int, frameID2 int) {
+	clr.logger.Debugf("processing match for %d and %d\n", frameID1, frameID2)
+
 	if frameID1 == frameID2 {
 		return
 	}
@@ -141,8 +147,12 @@ func (clr *StrictClusterer) AddMatch(frameID1 int, frameID2 int) {
 	foundMatches := false
 
 	for groupID, group := range clr.groups {
+		clr.logger.Debugf("checking if both %d and %d match group %d  (%v)\n", frameID1, frameID2, groupID, group)
+
 		if clr.frameMatchesGroup(frameID1, groupID) && clr.frameMatchesGroup(frameID2, groupID) {
 			clr.groups[groupID] = removeDuplicates(append(group, frameID1, frameID2))
+			clr.logger.Debugf("GROUP MATCH: added both %d and %d to group %d  ==>  (%v)\n",
+				frameID1, frameID2, groupID, clr.groups[groupID])
 			foundMatches = true
 		}
 	}
@@ -153,6 +163,8 @@ func (clr *StrictClusterer) AddMatch(frameID1 int, frameID2 int) {
 
 	// no existing group matches - create a new group
 	clr.groups[clr.nextGroupID] = []int{frameID1, frameID2}
+	clr.logger.Debugf("created new group for %d and %d ==> group %d (%v)\n",
+		frameID1, frameID2, clr.nextGroupID, clr.groups[clr.nextGroupID])
 	clr.nextGroupID++
 }
 
@@ -170,23 +182,23 @@ func (clr *StrictClusterer) Groups() [][]int {
 
 // Dump the state
 
-func (clr *StrictClusterer) DebugDump(writer *bufio.Writer) {
-	fmt.Fprintln(writer, "=== Strict Clusterer ===============================")
-	fmt.Fprintln(writer, "--- all matches ---")
+func (clr *StrictClusterer) DebugDump() {
+	clr.logger.Debug("=== Strict Clusterer ===============================")
+	clr.logger.Debug("--- all matches ---")
 
 	for frameID1, frameIDs := range clr.allMatches {
 		for frameID2 := range frameIDs {
-			fmt.Fprintf(writer, "[%d, %d]\n", frameID1, frameID2)
+			clr.logger.Debugf("[%d, %d]\n", frameID1, frameID2)
 		}
 	}
 
-	fmt.Fprintln(writer, "--- groups ---")
+	clr.logger.Debug("--- groups ---")
 
 	for groupID, group := range clr.groups {
-		fmt.Fprintf(writer, "Group %d  ->  %v\n", groupID, group)
+		clr.logger.Debugf("group %d:  %v\n", groupID, group)
 	}
 
-	fmt.Fprintln(writer, "=====================================================")
+	clr.logger.Debug("=====================================================")
 }
 
 // Check if a pair of frame IDs match
@@ -243,6 +255,7 @@ type UnionClusterer struct {
 	frame2group map[int]int   // frame ID -> group ID
 	groups      map[int][]int // group ID -> list of frame IDs
 	nextGroupID int           // next group ID to assign
+	logger      *logrus.Logger
 }
 
 // Add a pair of matched frames
@@ -323,12 +336,12 @@ func (clr *UnionClusterer) Groups() [][]int {
 
 // Dump the state
 
-func (clr *UnionClusterer) DebugDump(writer *bufio.Writer) {
-	fmt.Fprintln(writer, "=== Union Clusterer ===============================")
+func (clr *UnionClusterer) DebugDump() {
+	clr.logger.Debug("=== Union Clusterer ===============================")
 
 	for groupID, group := range clr.groups {
-		fmt.Fprintf(writer, "Group %d  ->  %v\n", groupID, group)
+		clr.logger.Debugf("group %d:  %v\n", groupID, group)
 	}
 
-	fmt.Fprintln(writer, "=====================================================")
+	clr.logger.Debugf("=====================================================")
 }
