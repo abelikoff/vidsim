@@ -198,7 +198,7 @@ func (state *State) GetComparisonScore(frameID1 int, frameID2 int) (float32, boo
 	}
 
 	if info.FalsePositive {
-		return -info.Score, true
+		return -1000, true
 	}
 
 	return info.Score, true
