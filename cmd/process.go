@@ -40,23 +40,7 @@ it consideres similar. The report is output in JSON format.
 
 		logger.Infof("Running with %d parallel workers", nWorkers)
 
-		var clMode match.ClusteringMethod
-
-		switch *clusteringMode {
-		case "none":
-			clMode = match.None
-
-		case "union":
-			clMode = match.Loose
-
-		case "strict":
-			clMode = match.Strict
-
-		default:
-			logger.Fatalf("Unknown clustering mode: %s", *clusteringMode)
-		}
-
-		proc := processor.MakeProcessor(nWorkers, *stateDirectory, clMode, logger)
+		proc := processor.MakeProcessor(nWorkers, *stateDirectory, logger)
 		proc.ChrTolerance = *chromTolerance
 		proc.PropTolerance = *propTolerance
 		proc.UseAbsolutePaths = *useAbsolutePaths
@@ -65,6 +49,20 @@ it consideres similar. The report is output in JSON format.
 		proc.ExternalFramegenTool = *externalFramegenPgm
 		proc.ExternalComparisonTool = *externalComparisonPgm
 		proc.DebugMode = *debugMode
+
+		switch *clusteringMode {
+		case "none":
+			proc.ClusteringMethod = match.None
+
+		case "union":
+			proc.ClusteringMethod = match.Loose
+
+		case "strict":
+			proc.ClusteringMethod = match.Strict
+
+		default:
+			logger.Fatalf("Unknown clustering mode: %s", *clusteringMode)
+		}
 
 		if *similarityThreshold < 0 || *similarityThreshold > 1 {
 			logger.Fatalf("Bad similarity threshold: %f", *similarityThreshold)

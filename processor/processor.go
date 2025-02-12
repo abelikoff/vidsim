@@ -31,11 +31,12 @@ type Processor struct {
 	clusterer              match.Clusterer // responsible for clustering the matches
 	exclusionRx            *regexp.Regexp  // exclude files matching pattern
 	bucketMutex            sync.Mutex
-	QuietMode              bool          // be really quiet (only show warnings and errors)
-	ExternalFramegenTool   string        // Program to use for frame generation
-	ExternalComparisonTool string        // Program to use for image comparison
-	OutputWriter           *bufio.Writer // where to write the report (nil means stdout)
-	SimilarityThreshold    float32       // images with similarity score above the threshold are considered a match
+	QuietMode              bool                   // be really quiet (only show warnings and errors)
+	ExternalFramegenTool   string                 // Program to use for frame generation
+	ExternalComparisonTool string                 // Program to use for image comparison
+	ClusteringMethod       match.ClusteringMethod // Clustering method
+	OutputWriter           *bufio.Writer          // where to write the report (nil means stdout)
+	SimilarityThreshold    float32                // images with similarity score above the threshold are considered a match
 
 	ScorePrefix          string // Prefix to use for score records
 	UseAbsolutePaths     bool   // When true filenames will be stored in the state with absolute paths
@@ -51,7 +52,7 @@ type Processor struct {
 	PropTolerance float64 // proportion tolerance
 }
 
-func MakeProcessor(numWorkers int, stateDirectory string, clusteringMode match.ClusteringMethod, logger *logrus.Logger) *Processor {
+func MakeProcessor(numWorkers int, stateDirectory string, logger *logrus.Logger) *Processor {
 	if numWorkers < 1 || numWorkers > 64 {
 		logger.Fatalf("Bad number of workers: %d", numWorkers)
 	}
@@ -62,6 +63,7 @@ func MakeProcessor(numWorkers int, stateDirectory string, clusteringMode match.C
 	proc.ChrTolerance = DefaultChrominanceTolerance
 	proc.PropTolerance = DefaultProportionTolerance
 	proc.SimilarityThreshold = DefaultSimilarityThreshold
+	proc.ClusteringMethod = match.Strict
 
 	proc.bucketMutex = sync.Mutex{}
 
@@ -73,7 +75,6 @@ func MakeProcessor(numWorkers int, stateDirectory string, clusteringMode match.C
 		logger.Fatalf("Failed to initialize state: %s", err)
 	}
 
-	proc.clusterer = match.NewClusterer(clusteringMode, logger)
 	return proc
 }
 
@@ -90,6 +91,10 @@ func (proc *Processor) SetExclusionPattern(pattern string) error {
 func (proc *Processor) Process(directories []string) error {
 	if len(directories) < 1 {
 		proc.logger.Fatal("No directories passed")
+	}
+
+	if proc.clusterer == nil {
+		proc.clusterer = match.NewClusterer(proc.ClusteringMethod, proc.logger)
 	}
 
 	proc.stats.QuietMode = proc.QuietMode

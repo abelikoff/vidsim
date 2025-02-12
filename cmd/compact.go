@@ -4,7 +4,6 @@ Copyright © 2024 Alexander L. Belikoff <alexander@belikoff.net>
 package cmd
 
 import (
-	"github.com/abelikoff/vidsim/match"
 	"github.com/abelikoff/vidsim/processor"
 	"github.com/spf13/cobra"
 )
@@ -23,7 +22,7 @@ safety protection against such case).
 	Run: func(_ *cobra.Command, args []string) {
 		logger := MakeLogger()
 		nWorkers := 1
-		proc := processor.MakeProcessor(nWorkers, *stateDirectory, match.None, logger)
+		proc := processor.MakeProcessor(nWorkers, *stateDirectory, logger)
 		proc.ScorePrefix = *scorePrefix
 		proc.ChrTolerance = *chromTolerance
 		proc.PropTolerance = *propTolerance
