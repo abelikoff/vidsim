@@ -125,7 +125,7 @@ func (proc *Processor) Unmatch(files []string) error {
 	failed := false
 	numFiles := len(files)
 
-	for ii := range numFiles {
+	for ii := 1; ii < numFiles; ii++ { // ii = 0 is meaningless because of the inner loop
 		frameID1, found := proc.state.GetFileID(files[ii])
 
 		if !found {
