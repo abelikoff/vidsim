@@ -8,8 +8,8 @@ import (
 	"os"
 	"runtime"
 
+	"github.com/abelikoff/vidsim/match"
 	"github.com/abelikoff/vidsim/processor"
-	"github.com/abelikoff/vidsim/state"
 	"github.com/spf13/cobra"
 )
 
@@ -40,17 +40,17 @@ it consideres similar. The report is output in JSON format.
 
 		logger.Infof("Running with %d parallel workers", nWorkers)
 
-		var clMode state.ClusteringMethod
+		var clMode match.ClusteringMethod
 
 		switch *clusteringMode {
 		case "none":
-			clMode = state.None
+			clMode = match.None
 
 		case "union":
-			clMode = state.Loose
+			clMode = match.Loose
 
 		case "strict":
-			clMode = state.Strict
+			clMode = match.Strict
 
 		default:
 			logger.Fatalf("Unknown clustering mode: %s", *clusteringMode)
