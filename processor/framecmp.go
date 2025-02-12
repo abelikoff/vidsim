@@ -59,9 +59,13 @@ func (proc *Processor) generateComparisonJobs(requestQueue chan fcmpRequest) {
 
 		for jj := range ii {
 			frameID2 := proc.frames[jj]
-			score, found := proc.state.GetComparisonScore(frameID1, frameID2)
+			score, falsePositive, found := proc.state.GetComparisonScore(frameID1, frameID2)
 
 			if found {
+				if falsePositive {
+					score = -1000
+				}
+
 				proc.bucketResults(frameID1, frameID2, score)
 				proc.stats.NumCacheHits++
 				proc.stats.IncNumComparisonsMade()

@@ -175,10 +175,9 @@ func (state *State) GetFrameFileName(frameID int) string {
 	return filepath.Join(state.dataDirectory, fmt.Sprintf("frame%06d.jpg", frameID))
 }
 
-func (state *State) GetComparisonScore(frameID1 int, frameID2 int) (float32, bool) {
+func (state *State) GetComparisonScore(frameID1 int, frameID2 int) (float32, bool, bool) {
 	if state.persistent {
-		score, found := state.getComparisonScorePersistent(frameID1, frameID2)
-		return score, found
+		return state.getComparisonScorePersistent(frameID1, frameID2)
 	}
 
 	// make sure frame IDs are ordered
@@ -194,14 +193,10 @@ func (state *State) GetComparisonScore(frameID1 int, frameID2 int) (float32, boo
 	state.mutex.RUnlock()
 
 	if !found {
-		return 0, found
+		return 0, false, found
 	}
 
-	if info.FalsePositive {
-		return -1000, true
-	}
-
-	return info.Score, true
+	return info.Score, info.FalsePositive, true
 }
 
 func (state *State) SetComparisonScore(frameID1 int, frameID2 int, score float32) {
@@ -381,7 +376,7 @@ func (state *State) getImageFramePersistent(path string) (int, bool) {
 	return state.decodeFrameValue(valCopy), true
 }
 
-func (state *State) getComparisonScorePersistent(frameID1, frameID2 int) (float32, bool) {
+func (state *State) getComparisonScorePersistent(frameID1, frameID2 int) (float32, bool, bool) {
 	var score float32
 	var falsePositive bool
 
@@ -407,14 +402,10 @@ func (state *State) getComparisonScorePersistent(frameID1, frameID2 int) (float3
 				frameID1, frameID2, err)
 		}
 
-		return 0, false
+		return 0, false, false
 	}
 
-	if falsePositive {
-		score = -score
-	}
-
-	return score, true
+	return score, falsePositive, true
 }
 
 func (state *State) setFileFrameIDPersistent(path string, frameID int) {
