@@ -47,7 +47,7 @@ func init() {
 	// rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.vidsim.yaml)")
 	numWorkers = rootCmd.PersistentFlags().IntP("workers", "P", 0,
 		"number of parallel workers")
-	stateDirectory = rootCmd.PersistentFlags().StringP("state_directory", "d", "",
+	stateDirectory = rootCmd.PersistentFlags().StringP("state_directory", "d", ".vidsim",
 		"directory to store/use the state")
 	scorePrefix = processCmd.Flags().StringP("score_prefix", "", "",
 		"Prefix to use for score data")
