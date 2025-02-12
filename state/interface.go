@@ -1,3 +1,6 @@
+/*
+Copyright © 2024 Alexander L. Belikoff <alexander@belikoff.net>
+*/
 package state
 
 import "bufio"

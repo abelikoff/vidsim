@@ -22,7 +22,7 @@ In its basic form, `vidsim` scans specified directories and compares all video f
 vidsim process <dir1> <dir2> ...
 ```
 
-Since frame extraction and comparison are relatively slow and expensive, `vidsim` supports caching of the artifacts it computes, using cached values in future re-runs, which massively speeds up the operation. In order to invoke caching, one specifies a directory to be used for cached data with `-d` option:
+While processing data, `vidsim` cahces the computed artifacts, using cached values in future re-runs. By default state is kept in `.vidsim` directory. One can customize the name with `-d` option:
 
 ```sh
 vidsim -d .my.cache.dir process <dir1> <dir2> ...
@@ -99,6 +99,16 @@ State can be compacted, removing data for files that no longer exist:
 vidsim -d .my.cache.dir compact
 ```
 
+### Exploring the state
+
+The `peek` command allows extracting different data from the state:
+
+```sh
+vidsim -d .my.state.dir peek file <filename>                  - show file ID for the file
+vidsim -d .my.state.dir peek score <filename> <filename>      - show match score for 2 files
+vidsim -d .my.state.dir peek score <id> <id>                  - show match score for 2 files (represented by IDs)
+```
+
 ### Dumping the state
 
 You can dump the accumulated state (frame information, comparison scores):
@@ -111,7 +121,7 @@ vidsim -d .my.cache.dir dump
 
 By default `vidsim` saves filenames using relative (to the top directories specified) paths. This has two implications:
 
--   When operating on files (e.g. marking false positives), paths have to be specified precisely using that convention.
--   When compacting the state, the command should be run _in the same directory where `process` command was run_, otherwise `vidsim` will not find the files listed in the state and will think those files have been deleted (it does have a sanity check agains mass deletion however).
+- When operating on files (e.g. marking false positives), paths have to be specified precisely using that convention.
+- When compacting the state, the command should be run _in the same directory where `process` command was run_, otherwise `vidsim` will not find the files listed in the state and will think those files have been deleted (it does have a sanity check agains mass deletion however).
 
 Alternatively, one can specify a `--abs_paths` option to make `vidsim` store absolute paths. This takes more space but it avoids the problem above.

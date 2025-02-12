@@ -1,3 +1,6 @@
+/*
+Copyright © 2024 Alexander L. Belikoff <alexander@belikoff.net>
+*/
 package state
 
 import (
@@ -132,7 +135,7 @@ func (state *BadgerBackedState) GetFileID(path string) (int, bool) {
 	})
 
 	if err != nil {
-		state.logger.Errorf("GetFileID('%s'): %s", path, err)
+		state.logger.Debugf("GetFileID('%s'): %s", path, err)
 		return 0, false
 	}
 

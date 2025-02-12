@@ -6,9 +6,11 @@ package processor
 import (
 	"bufio"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"sync"
 
 	"github.com/abelikoff/vidsim/match"
@@ -68,7 +70,7 @@ func MakeProcessor(numWorkers int, stateDirectory string, logger *logrus.Logger)
 	proc.bucketMutex = sync.Mutex{}
 
 	var err error
-	//proc.state, err = state.MakeEphemeralState(stateDirectory, logger) // TODO: implement scorePrefix
+	//proc.state, err = state.MakeEphemeralState(stateDirectory, logger)
 	proc.state, err = state.MakeBadgerBackedState(stateDirectory, logger, proc.ScorePrefix)
 
 	if err != nil {
@@ -154,6 +156,83 @@ func (proc *Processor) Unmatch(files []string) error {
 
 	if failed {
 		return errors.New("Failed to unmatch files")
+	}
+
+	return nil
+}
+
+// Peek functionality
+
+func (proc *Processor) Peek(args []string) error {
+	if len(args) < 1 {
+		proc.logger.Fatal("Bad peek syntax")
+	}
+
+	if len(args) == 2 && args[0] == "file" {
+		/*if id, err := strconv.Atoi(args[1]); err == nil {
+			filename, found := proc.state.GetVideoFile(id)
+
+			if !found {
+				proc.logger.Fatalf("File with ID %d is unknown", id)
+			}
+
+			fmt.Printf("%d  =>  '%s'\n", id, filename)
+		} else { */
+		filename := args[1]
+		id, found := proc.state.GetFileID(filename)
+
+		if !found {
+			proc.logger.Fatalf("File '%s' is unknown", filename)
+		}
+
+		fmt.Printf("'%s'  =>  %d\n", filename, id)
+		// }
+	} else if len(args) == 3 && args[0] == "score" {
+		var id1, id2 int
+		var err error
+
+		if id1, err = strconv.Atoi(args[1]); err != nil {
+			id1 = -1
+		}
+
+		if id2, err = strconv.Atoi(args[2]); err != nil {
+			id2 = -1
+		}
+
+		if id1 >= 0 && id2 >= 0 {
+			score, falsePositive, found := proc.state.GetComparisonScore(id1, id2)
+
+			if !found {
+				proc.logger.Fatalf("Score for %d / %d not found", id1, id2)
+			}
+
+			fmt.Printf("%d %d  => %.4f  %v\n", id1, id2, score, falsePositive)
+		} else if id1 < 0 && id2 < 0 {
+			id1, found := proc.state.GetFileID(args[1])
+
+			if !found {
+				proc.logger.Fatalf("File '%s' is unknown", args[1])
+			}
+
+			id2, found := proc.state.GetFileID(args[2])
+
+			if !found {
+				proc.logger.Fatalf("File '%s' is unknown", args[2])
+			}
+
+			score, falsePositive, found := proc.state.GetComparisonScore(id1, id2)
+
+			if !found {
+				proc.logger.Fatalf("Score for %d / %d not found", id1, id2)
+			}
+
+			fmt.Printf("%d %d  => %.4f  %v\n", id1, id2, score, falsePositive)
+		} else {
+			proc.logger.Fatal("Arguments should be both either files or IDs")
+		}
+
+	} else {
+		proc.logger.Fatal("Bad peek syntax")
 	}
 
 	return nil
