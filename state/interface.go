@@ -1,16 +1,18 @@
 package state
 
+import "bufio"
+
 // State manager interface.
 
-type StateNew interface {
-	Close()                                                                 // Close the state
+type State interface {
 	AddFile(path string) (int, bool)                                        // Add file to the state and return its ID
-	DeleteFile(path string)                                                 // Delete file from the state
-	GetIDForFile(path string) (int, bool)                                   // Get ID for  file
-	GetFileForID(ID int) (string, bool)                                     // Get file for ID
+	GetFileID(path string) (int, bool)                                      // Get ID corresponding to the video file
+	GetVideoFile(ID int) (string, bool)                                     // Get video file for ID
 	GetFrameFile(ID int) string                                             // Get frame file based on ID
-	GetComparisonScore(ID1 int, ID2 int) (float32, bool, bool)              // Get comparison score for two  files
-	SetComparisonScore(ID1 int, ID2 int, score float32, falsePositive bool) // Set comparison score for two  files
+	GetComparisonScore(ID1 int, ID2 int) (float32, bool, bool)              // Get comparison score for two files
+	SetComparisonScore(ID1 int, ID2 int, score float32, falsePositive bool) // Set comparison score for two files
 	Compact() error                                                         // Compact the state
-	DebugDump()                                                             // Dump the state
+	Dump(writer *bufio.Writer) error                                        // Dump the state
+	DebugDump()                                                             // Dump dump of the state
+	Close()                                                                 // Close the state
 }

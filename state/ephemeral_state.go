@@ -1,6 +1,7 @@
 package state
 
 import (
+	"bufio"
 	"errors"
 	"fmt"
 	"os"
@@ -78,14 +79,9 @@ func (state *EphemeralState) AddFile(path string) (int, bool) {
 	return frameID, found
 }
 
-func (state *EphemeralState) DeleteFile(path string) {
-	state.mutex.Lock()
-	defer state.mutex.Unlock()
+// Get ID corresponding to the video file
 
-	delete(state.image2frame, path)
-}
-
-func (state *EphemeralState) GetIDForFile(path string) (int, bool) {
+func (state *EphemeralState) GetFileID(path string) (int, bool) {
 	state.mutex.RLock()
 	defer state.mutex.RUnlock()
 
@@ -93,15 +89,9 @@ func (state *EphemeralState) GetIDForFile(path string) (int, bool) {
 	return frameID, found
 }
 
-func (state *EphemeralState) SetframeID(path string, frameID int) {
-	state.mutex.Lock()
-	defer state.mutex.Unlock()
+// Get video file for ID
 
-	state.image2frame[path] = frameID
-	state.frame2image[frameID] = path
-}
-
-func (state *EphemeralState) GetImageFile(frameID int) (string, bool) {
+func (state *EphemeralState) GetVideoFile(frameID int) (string, bool) {
 	state.mutex.RLock()
 	defer state.mutex.RUnlock()
 
@@ -109,11 +99,13 @@ func (state *EphemeralState) GetImageFile(frameID int) (string, bool) {
 	return path, found
 }
 
-// Get name of the image frame file corresponding to the frame ID
+// Get frame file based on ID
 
 func (state *EphemeralState) GetFrameFile(frameID int) string {
 	return filepath.Join(state.dataDirectory, fmt.Sprintf("frame%06d.jpg", frameID))
 }
+
+// Get comparison score for two files
 
 func (state *EphemeralState) GetComparisonScore(frameID1 int, frameID2 int) (float32, bool, bool) {
 	// make sure frame IDs are ordered
@@ -135,7 +127,9 @@ func (state *EphemeralState) GetComparisonScore(frameID1 int, frameID2 int) (flo
 	return info.Score, info.FalsePositive, true
 }
 
-func (state *EphemeralState) SetComparisonScore(frameID1 int, frameID2 int, score float32) {
+// Set comparison score for two files
+
+func (state *EphemeralState) SetComparisonScore(frameID1 int, frameID2 int, score float32, falsePositive bool) {
 	// make sure frame IDs are ordered
 
 	if frameID1 > frameID2 {
@@ -144,8 +138,14 @@ func (state *EphemeralState) SetComparisonScore(frameID1 int, frameID2 int, scor
 
 	key := [2]int{frameID1, frameID2}
 	state.mutex.Lock()
-	state.matchScores[key] = Match{Score: score, FalsePositive: false}
+	state.matchScores[key] = Match{Score: score, FalsePositive: falsePositive}
 	state.mutex.Unlock()
+}
+
+// Dump the state
+
+func (state *EphemeralState) Dump(writer *bufio.Writer) error {
+	return nil
 }
 
 func (state *EphemeralState) DebugDump() {
@@ -166,4 +166,10 @@ func (state *EphemeralState) DebugDump() {
 	for k, v := range state.matchScores {
 		state.logger.Debugf("[%d, %d] -> {Score: %f, FalsePositive: %t}\n", k[0], k[1], v.Score, v.FalsePositive)
 	}
+}
+
+// Compact the state
+
+func (state *EphemeralState) Compact() error {
+	return nil
 }

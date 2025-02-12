@@ -24,7 +24,7 @@ const (
 type Processor struct {
 	numWorkers             int   // number of workers
 	frames                 []int // list of all frame IDs we will be processing
-	state                  *state.State
+	state                  state.State
 	stats                  StatsCollector
 	logger                 *logrus.Logger
 	clusterer              state.Clusterer // responsible for clustering the matches
@@ -58,13 +58,15 @@ func MakeProcessor(numWorkers int, stateDirectory string, clusteringMode state.C
 	proc := new(Processor)
 	proc.numWorkers = numWorkers
 	proc.logger = logger
-	proc.state = state.MakeState()
 	proc.ChrTolerance = DefaultChrominanceTolerance
 	proc.PropTolerance = DefaultProportionTolerance
 	proc.SimilarityThreshold = DefaultSimilarityThreshold
 
 	proc.bucketMutex = sync.Mutex{}
-	err := proc.state.Init(stateDirectory, logger, proc.ScorePrefix)
+
+	var err error
+	//proc.state, err = state.MakeEphemeralState(stateDirectory, logger) // TODO: implement scorePrefix
+	proc.state, err = state.MakeBadgerBackedState(stateDirectory, logger, proc.ScorePrefix)
 
 	if err != nil {
 		logger.Fatalf("Failed to initialize state: %s", err)
@@ -123,7 +125,7 @@ func (proc *Processor) Unmatch(files []string) error {
 	numFiles := len(files)
 
 	for ii := range numFiles {
-		frameID1, found := proc.state.GetframeID(files[ii])
+		frameID1, found := proc.state.GetFileID(files[ii])
 
 		if !found {
 			proc.logger.Errorf("File '%s' is unknown", files[ii])
@@ -132,7 +134,7 @@ func (proc *Processor) Unmatch(files []string) error {
 		}
 
 		for jj := range ii {
-			frameID2, found := proc.state.GetframeID(files[jj])
+			frameID2, found := proc.state.GetFileID(files[jj])
 
 			if !found {
 				proc.logger.Errorf("File '%s' is unknown", files[jj])
@@ -140,7 +142,7 @@ func (proc *Processor) Unmatch(files []string) error {
 				continue
 			}
 
-			proc.state.UnmatchFrames(frameID1, frameID2, true)
+			proc.state.SetComparisonScore(frameID1, frameID2, 0, true)
 		}
 	}
 
@@ -154,7 +156,7 @@ func (proc *Processor) Unmatch(files []string) error {
 // Perform state datastore compaction
 
 func (proc *Processor) CompactState() error {
-	return proc.state.CompactDataStore()
+	return proc.state.Compact()
 }
 
 // Dump the state

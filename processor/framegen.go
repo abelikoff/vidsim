@@ -91,9 +91,9 @@ func (proc *Processor) fgSendJobs(directories []string, requestQueue chan fgRequ
 				}
 			}
 
-			frameID, found := proc.state.RegisterFile(path)
+			frameID, found := proc.state.AddFile(path)
 			(*frames)[frameID] = true
-			frameFile := proc.state.GetFrameFileName(frameID)
+			frameFile := proc.state.GetFrameFile(frameID)
 			_, err = os.Stat(frameFile)
 
 			if !found || err != nil {

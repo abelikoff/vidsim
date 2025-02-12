@@ -8,277 +8,70 @@ import (
 	"math"
 	"os"
 	"path/filepath"
-	"sync"
 
 	"github.com/dgraph-io/badger/v3"
 	"github.com/sirupsen/logrus"
 )
 
-type matchScore struct {
-	Score         float32 // comparison score [0..1]
-	FalsePositive bool    // true for false positives
+type BadgerBackedState struct {
+	dataDirectory   string
+	framePrefix     string // prefix used by frame mapping records
+	scorePrefix     []byte // prefix used by comparison score records
+	nextframeID     int
+	prefixKeyLength int
+
+	id2file map[int]string // file ID -> video filename (searching in DB is suboptimal)
+	db      *badger.DB
+	logger  *logrus.Logger
 }
 
-type OldState struct {
-	dataDirectory string
-	persistent    bool           // should we load and save the state?
-	framePrefix   string         // prefix used by frame mapping records
-	scorePrefix   []byte         // prefix used by comparison score records
-	image2frame   map[string]int // video filename -> frame ID
-	frame2image   map[int]string // frame ID -> video filename
-	nextframeID   int
+func MakeBadgerBackedState(stateDirectory string, logger *logrus.Logger, scorePrefix string) (*BadgerBackedState, error) {
+	state := new(BadgerBackedState)
 
-	matchScores map[[2]int]matchScore // pair of frame IDs (ordered numerically) -> match score information
-
-	mutex  *sync.RWMutex
-	db     *badger.DB
-	logger *logrus.Logger
-}
-
-func MakeState() *OldState {
-	state := new(OldState)
-
-	state.mutex = new(sync.RWMutex)
-	state.image2frame = make(map[string]int)
-	state.frame2image = make(map[int]string)
-	state.matchScores = make(map[[2]int]matchScore)
-	state.nextframeID = 1
-
-	return state
-}
-
-func (state *OldState) Init(stateDirectory string, logger *logrus.Logger, scorePrefix string) error {
+	state.prefixKeyLength = -1
 	state.logger = logger
 
-	if stateDirectory == "" {
-		dirName, err := os.MkdirTemp("", "vidsim")
-
-		if err != nil {
-			state.logger.Fatalf("Failed to create a temporary directory: %s", err)
-		}
-
-		state.dataDirectory = dirName
-		state.persistent = false
-	} else {
-		state.dataDirectory = stateDirectory
-		state.persistent = true
-	}
+	state.dataDirectory = stateDirectory
 
 	if state.dataDirectory == "." {
-		return errors.New("don't use the current directory to keep the state")
+		return nil, errors.New("don't use the current directory to keep the state")
 	}
 
-	if state.persistent {
-		state.framePrefix = "f:"
+	state.framePrefix = "f:"
 
-		if scorePrefix != "" {
-			state.scorePrefix = []byte("s:" + scorePrefix + ":")
-		} else {
-			state.scorePrefix = []byte("s:")
-		}
-
-		var err error
-		state.db, err = badger.Open(badger.DefaultOptions(filepath.Join(state.dataDirectory, "db")).WithLogger(nil))
-
-		if err != nil {
-			return err
-		}
-
-		maxID, err := state.getMaxFrameID()
-
-		if err != nil {
-			return err
-		}
-
-		state.nextframeID = maxID + 1
-		state.logger.Debugf("Next frame ID: %d", state.nextframeID)
+	if scorePrefix != "" {
+		state.scorePrefix = []byte("s:" + scorePrefix + ":")
+	} else {
+		state.scorePrefix = []byte("s:")
 	}
 
-	return nil
+	state.id2file = make(map[int]string)
+
+	var err error
+	state.db, err = badger.Open(badger.DefaultOptions(filepath.Join(state.dataDirectory, "db")).WithLogger(nil))
+
+	if err != nil {
+		return nil, err
+	}
+
+	maxID, err := state.getMaxFrameID()
+
+	if err != nil {
+		return nil, err
+	}
+
+	state.nextframeID = maxID + 1
+	state.logger.Debugf("Next frame ID: %d", state.nextframeID)
+
+	return state, nil
 }
 
-func (state *OldState) Close() {
+func (state *BadgerBackedState) Close() {
+	state.id2file = nil
 	state.db.Close()
 }
 
-func (state *OldState) RegisterFile(path string) (int, bool) {
-	// state.mutex.Lock()
-	// defer state.mutex.Unlock()
-
-	var frameID int
-	var found bool
-
-	if state.persistent {
-		frameID, found = state.AddFrameIDPersistent(path)
-	} else {
-		frameID, found = state.image2frame[path]
-
-		if !found {
-			frameID = state.nextframeID
-			state.nextframeID++
-			state.image2frame[path] = frameID
-		}
-	}
-
-	state.frame2image[frameID] = path
-	return frameID, found
-}
-
-func (state *OldState) DeleteFile(path string) {
-	// state.mutex.Lock()
-	// defer state.mutex.Unlock()
-
-	state.logger.Fatal("DeleteFile called")
-	delete(state.image2frame, path)
-}
-
-func (state *OldState) GetframeID(path string) (int, bool) {
-	// state.mutex.RLock()
-	// defer state.mutex.RUnlock()
-
-	if state.persistent {
-		frameID, found := state.getImageFramePersistent(path)
-
-		if found {
-			state.frame2image[frameID] = path
-		}
-
-		return frameID, found
-	}
-
-	frameID, found := state.image2frame[path]
-	return frameID, found
-}
-
-func (state *OldState) SetframeID(path string, frameID int) {
-	// state.mutex.Lock()
-	// defer state.mutex.Unlock()
-
-	if state.persistent {
-		state.setFileFrameIDPersistent(path, frameID)
-		return
-	}
-
-	state.image2frame[path] = frameID
-	state.frame2image[frameID] = path
-}
-
-func (state *OldState) GetImageFile(frameID int) (string, bool) {
-	// state.mutex.RLock()
-	// defer state.mutex.RUnlock()
-
-	path, found := state.frame2image[frameID]
-	return path, found
-}
-
-func (state *OldState) GetFrameFileName(frameID int) string {
-	return filepath.Join(state.dataDirectory, fmt.Sprintf("frame%06d.jpg", frameID))
-}
-
-func (state *OldState) GetComparisonScore(frameID1 int, frameID2 int) (float32, bool, bool) {
-	if state.persistent {
-		return state.getComparisonScorePersistent(frameID1, frameID2)
-	}
-
-	// make sure frame IDs are ordered
-
-	if frameID1 > frameID2 {
-		frameID2, frameID1 = frameID1, frameID2
-	}
-
-	key := [2]int{frameID1, frameID2}
-
-	state.mutex.RLock()
-	info, found := state.matchScores[key]
-	state.mutex.RUnlock()
-
-	if !found {
-		return 0, false, found
-	}
-
-	return info.Score, info.FalsePositive, true
-}
-
-func (state *OldState) SetComparisonScore(frameID1 int, frameID2 int, score float32) {
-	if state.persistent {
-		state.setComparisonScorePersistent(frameID1, frameID2, score, false)
-		return
-	}
-
-	// make sure frame IDs are ordered
-
-	if frameID1 > frameID2 {
-		frameID2, frameID1 = frameID1, frameID2
-	}
-
-	key := [2]int{frameID1, frameID2}
-	state.mutex.Lock()
-	state.matchScores[key] = matchScore{Score: score, FalsePositive: false}
-	state.mutex.Unlock()
-}
-
-func (state *OldState) UnmatchFrames(frameID1, frameID2 int, falsePositive bool) {
-	if !state.persistent {
-		state.logger.Error("Unmatching only supported with persistent state")
-		return
-	}
-
-	state.setComparisonScorePersistent(frameID1, frameID2, 0, falsePositive)
-}
-
-func (state *OldState) DebugDump() {
-	//state.logger.Debugf("--- scores ------------------\n%v\n", state.matchScores)
-}
-
-// ************************** Persistence methods ***********************************
-
-func (state *OldState) getMaxFrameID() (int, error) {
-	if !state.persistent {
-		return 0, errors.New("only supported with persistence")
-	}
-
-	var maxFrameID int
-	prefix := []byte(state.framePrefix)
-	err := state.db.View(func(txn *badger.Txn) error {
-		opts := badger.DefaultIteratorOptions
-		opts.PrefetchValues = false // Optimize for key-only iteration
-		it := txn.NewIterator(opts)
-		defer it.Close()
-
-		for it.Seek(prefix); it.ValidForPrefix(prefix); it.Next() {
-			item := it.Item()
-			// key := item.Key()
-
-			// Extract integer from value bytes
-			err := item.Value(func(val []byte) error {
-				frameID := state.decodeFrameValue(val)
-
-				if frameID > maxFrameID {
-					maxFrameID = frameID
-				}
-
-				return nil
-			})
-
-			if err != nil {
-				return err
-			}
-		}
-
-		return nil
-	})
-
-	if err != nil {
-		return 0, err
-	}
-
-	return maxFrameID, nil
-}
-
-func (state *OldState) AddFrameIDPersistent(path string) (int, bool) {
-	// state.mutex.Lock()
-	// defer state.mutex.Unlock()
-
+func (state *BadgerBackedState) AddFile(path string) (int, bool) {
 	frameID := -1
 	found := false
 
@@ -313,48 +106,18 @@ func (state *OldState) AddFrameIDPersistent(path string) (int, bool) {
 	})
 
 	if err != nil {
-		state.logger.Errorf("AddFrameIDPersistent('%s'): %s", path, err)
+		state.logger.Errorf("AddFile('%s'): %s", path, err)
 	}
 
+	state.id2file[frameID] = path
 	return frameID, found
 }
 
-func (state *OldState) GetFileFrameIDPersistent(path string) (int, bool) {
-	// state.mutex.Lock()
-	// defer state.mutex.Unlock()
+// Get ID for an already added file
+//
+// Returns frame ID and true if the file was found, false otherwise
 
-	frameID := -1
-	found := false
-
-	err := state.db.View(func(txn *badger.Txn) error {
-		item, err := txn.Get([]byte(path))
-
-		if err == nil { // record with a given key found
-			err = item.Value(func(val []byte) error {
-				frameID = state.decodeFrameValue(val)
-				return nil
-			})
-
-			if err != nil {
-				return err
-			}
-
-			found = true
-			return nil
-		}
-
-		return nil
-	})
-
-	if err != nil {
-		state.logger.Errorf("GetFileFrameIDPersistent('%s'): %s", path, err)
-		return 0, false
-	}
-
-	return frameID, found
-}
-
-func (state *OldState) getImageFramePersistent(path string) (int, bool) {
+func (state *BadgerBackedState) GetFileID(path string) (int, bool) {
 	var valCopy []byte
 
 	err := state.db.View(func(txn *badger.Txn) error {
@@ -376,7 +139,27 @@ func (state *OldState) getImageFramePersistent(path string) (int, bool) {
 	return state.decodeFrameValue(valCopy), true
 }
 
-func (state *OldState) getComparisonScorePersistent(frameID1, frameID2 int) (float32, bool, bool) {
+// Get video file for ID
+
+func (state *BadgerBackedState) GetVideoFile(ID int) (string, bool) {
+	file, found := state.id2file[ID]
+	return file, found
+}
+
+// Get name of the image frame file corresponding to the frame ID
+
+func (state *BadgerBackedState) GetFrameFile(frameID int) string {
+	return filepath.Join(state.dataDirectory, fmt.Sprintf("frame%06d.jpg", frameID))
+}
+
+// Get comparison score for two files
+//
+// Returns 3 values:
+// - the score
+// - whether two images are considered a false positive match
+// - true if the score was found, false otherwise
+
+func (state *BadgerBackedState) GetComparisonScore(frameID1, frameID2 int) (float32, bool, bool) {
 	var score float32
 	var falsePositive bool
 
@@ -398,7 +181,7 @@ func (state *OldState) getComparisonScorePersistent(frameID1, frameID2 int) (flo
 
 	if err != nil {
 		if !errors.Is(err, badger.ErrKeyNotFound) {
-			state.logger.Errorf("GetComparisonScorePersistent(%d, %d): %s",
+			state.logger.Errorf("GetComparisonScore(%d, %d): %s",
 				frameID1, frameID2, err)
 		}
 
@@ -408,17 +191,9 @@ func (state *OldState) getComparisonScorePersistent(frameID1, frameID2 int) (flo
 	return score, falsePositive, true
 }
 
-func (state *OldState) setFileFrameIDPersistent(path string, frameID int) {
-	err := state.db.Update(func(txn *badger.Txn) error {
-		return txn.Set(state.encodeFrameKey(path), []byte{byte(frameID)})
-	})
+// Set comparison score for two files
 
-	if err != nil {
-		state.logger.Errorf("setFileFrameIDPersistent('%s'): %s", path, err)
-	}
-}
-
-func (state *OldState) setComparisonScorePersistent(frameID1, frameID2 int, score float32, isFalsePositive bool) {
+func (state *BadgerBackedState) SetComparisonScore(frameID1, frameID2 int, score float32, isFalsePositive bool) {
 	state.logger.Debugf("saving score for %d, %d => %.4f (fp: %v)", frameID1, frameID2, score, isFalsePositive)
 
 	err := state.db.Update(func(txn *badger.Txn) error {
@@ -432,16 +207,12 @@ func (state *OldState) setComparisonScorePersistent(frameID1, frameID2 int, scor
 	})
 
 	if err != nil {
-		state.logger.Errorf("setComparisonScorePersistent(%d, %d): %s",
+		state.logger.Errorf("setComparisonScore(%d, %d): %s",
 			frameID1, frameID2, err)
 	}
 }
 
-func (state *OldState) CompactDataStore() error {
-	if !state.persistent {
-		return errors.New("only supported with persistence")
-	}
-
+func (state *BadgerBackedState) Compact() error {
 	prefix := []byte(state.framePrefix)
 
 	// Step 1 - make sure we are in the right directory. Filenames are stored as relative paths so running
@@ -527,7 +298,7 @@ func (state *OldState) CompactDataStore() error {
 
 				frameID := state.decodeFrameValue(value)
 				validFrames[frameID] = true
-				validImages[state.GetFrameFileName(frameID)] = true
+				validImages[state.GetFrameFile(frameID)] = true
 			}
 		}
 		return nil
@@ -650,11 +421,7 @@ Summary:
 
 // Dump state
 
-func (state *OldState) Dump(writer *bufio.Writer) error {
-	if !state.persistent {
-		return errors.New(`only supported with persistence`)
-	}
-
+func (state *BadgerBackedState) Dump(writer *bufio.Writer) error {
 	// Dump frame information
 
 	prefix := []byte(state.framePrefix)
@@ -675,7 +442,7 @@ func (state *OldState) Dump(writer *bufio.Writer) error {
 			}
 
 			frameID := state.decodeFrameValue(value)
-			fmt.Fprintf(writer, "frame %6d  %20s  %s\n", frameID, state.GetFrameFileName(frameID), filename)
+			fmt.Fprintf(writer, "frame %6d  %20s  %s\n", frameID, state.GetFrameFile(frameID), filename)
 		}
 
 		return nil
@@ -717,15 +484,18 @@ func (state *OldState) Dump(writer *bufio.Writer) error {
 	return dbErr
 }
 
-var prefixKeyLength = -1
+// Debug dump state
 
-func (state *OldState) encodeFrameKey(path string) []byte {
+func (state *BadgerBackedState) DebugDump() {
+}
+
+func (state *BadgerBackedState) encodeFrameKey(path string) []byte {
 	return []byte(state.framePrefix + path)
 }
 
 // Extract the filename from encoded frame key
 
-func (state *OldState) decodeFrameKey(encoded []byte) string {
+func (state *BadgerBackedState) decodeFrameKey(encoded []byte) string {
 	if prefixKeyLength < 0 {
 		prefixKeyLength = len([]byte(state.framePrefix))
 	}
@@ -733,17 +503,17 @@ func (state *OldState) decodeFrameKey(encoded []byte) string {
 	return string(encoded[prefixKeyLength:])
 }
 
-func (state *OldState) encodeFrameValue(frameID int) []byte {
+func (state *BadgerBackedState) encodeFrameValue(frameID int) []byte {
 	key := make([]byte, 8)
 	binary.BigEndian.PutUint64(key, uint64(frameID))
 	return key
 }
 
-func (state *OldState) decodeFrameValue(encoded []byte) int {
+func (state *BadgerBackedState) decodeFrameValue(encoded []byte) int {
 	return int(binary.BigEndian.Uint64(encoded))
 }
 
-func (state *OldState) encodeScoreKey(frameID1, frameID2 int) []byte {
+func (state *BadgerBackedState) encodeScoreKey(frameID1, frameID2 int) []byte {
 	keyLen := len(state.scorePrefix) + 2*8 // prefix + 2 * uint64
 
 	if frameID1 > frameID2 {
@@ -759,27 +529,66 @@ func (state *OldState) encodeScoreKey(frameID1, frameID2 int) []byte {
 	return key
 }
 
-func (state *OldState) decodeScoreKey(encoded []byte) (int, int) {
+func (state *BadgerBackedState) decodeScoreKey(encoded []byte) (int, int) {
 	prefixLen := len(state.scorePrefix)
 	frameID1 := int(binary.BigEndian.Uint64(encoded[prefixLen : prefixLen+8]))
 	frameID2 := int(binary.BigEndian.Uint64(encoded[prefixLen+8:]))
 	return frameID1, frameID2
 }
 
-func (state *OldState) encodeScoreData(score float32, falsePositive bool) ([]byte, error) {
+func (state *BadgerBackedState) encodeScoreData(score float32, falsePositive bool) ([]byte, error) {
 	b := make([]byte, 5) // 4 bytes (float32) + 1 byte (bool)
 	binary.BigEndian.PutUint32(b, math.Float32bits(score))
 	b[4] = boolToByte(falsePositive)
 	return b, nil
 }
 
-func (state *OldState) decodeScoreData(encoded []byte) (float32, bool) {
+func (state *BadgerBackedState) decodeScoreData(encoded []byte) (float32, bool) {
 	score := math.Float32frombits(binary.BigEndian.Uint32(encoded[:4]))
 	falsePositive := encoded[4] != 0
 	return score, falsePositive
 }
 
-func boolToByte(b bool) byte {
+func (state *BadgerBackedState) getMaxFrameID() (int, error) {
+	var maxFrameID int
+	prefix := []byte(state.framePrefix)
+	err := state.db.View(func(txn *badger.Txn) error {
+		opts := badger.DefaultIteratorOptions
+		opts.PrefetchValues = false // Optimize for key-only iteration
+		it := txn.NewIterator(opts)
+		defer it.Close()
+
+		for it.Seek(prefix); it.ValidForPrefix(prefix); it.Next() {
+			item := it.Item()
+			// key := item.Key()
+
+			// Extract integer from value bytes
+			err := item.Value(func(val []byte) error {
+				frameID := state.decodeFrameValue(val)
+
+				if frameID > maxFrameID {
+					maxFrameID = frameID
+				}
+
+				return nil
+			})
+
+			if err != nil {
+				return err
+			}
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		return 0, err
+	}
+
+	return maxFrameID, nil
+}
+
+func (state *BadgerBackedState) boolToByte(b bool) byte {
 	if b {
 		return 1
 	}

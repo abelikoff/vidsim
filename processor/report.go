@@ -54,7 +54,7 @@ func (proc *Processor) GenerateReport() {
 				filesep = ""
 			}
 
-			videoFile, _ := proc.state.GetImageFile(frameID)
+			videoFile, _ := proc.state.GetVideoFile(frameID)
 			fmt.Fprintf(writer, "      \"%s\"%s\n", videoFile, filesep)
 		}
 

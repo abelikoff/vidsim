@@ -89,7 +89,7 @@ func (proc *Processor) processComparisonResults(responseQueue chan fcmpResponse)
 		numResponses++
 
 		if response.err == nil {
-			proc.state.SetComparisonScore(response.frameID1, response.frameID2, response.score)
+			proc.state.SetComparisonScore(response.frameID1, response.frameID2, response.score, false)
 			proc.bucketResults(response.frameID1, response.frameID2, response.score)
 		}
 
@@ -103,8 +103,8 @@ func (proc *Processor) fcmpWorker(workerID int, requestQueue chan fcmpRequest, r
 	defer wg.Done()
 
 	for req := range requestQueue {
-		file1 := proc.state.GetFrameFileName(req.frameID1)
-		file2 := proc.state.GetFrameFileName(req.frameID2)
+		file1 := proc.state.GetFrameFile(req.frameID1)
+		file2 := proc.state.GetFrameFile(req.frameID2)
 		score, err := proc.compareImageFiles(file1, file2)
 
 		if err != nil {
