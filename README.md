@@ -93,10 +93,10 @@ Comparison scores for both runs will be stored in the state without intermixing 
 
 ### Compacting the state
 
-State can be compacted, removing data for files that no longer exist:
+State can be compacted, removing data for files that no longer exist, by passing `--compact` option:
 
 ```sh
-vidsim -d .my.cache.dir compact
+vidsim -d .my.cache.dir process --compact mydir
 ```
 
 ### Exploring the state
