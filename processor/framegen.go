@@ -12,7 +12,6 @@ import (
 )
 
 type fgRequest struct {
-	id             int
 	videoFile      string
 	frameID        int
 	frameImageFile string

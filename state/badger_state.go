@@ -12,6 +12,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/abelikoff/vidsim/util"
 	"github.com/dgraph-io/badger/v3"
 	"github.com/sirupsen/logrus"
 )
@@ -28,12 +29,11 @@ type BadgerBackedState struct {
 	logger  *logrus.Logger
 }
 
-func MakeBadgerBackedState(stateDirectory string, logger *logrus.Logger, scorePrefix string) (*BadgerBackedState, error) {
+func MakeBadgerBackedState(stateDirectory string, logger *logrus.Logger,
+	scorePrefix string) (*BadgerBackedState, error) {
 	state := new(BadgerBackedState)
-
 	state.prefixKeyLength = -1
 	state.logger = logger
-
 	state.dataDirectory = stateDirectory
 
 	if state.dataDirectory == "." {
@@ -144,8 +144,8 @@ func (state *BadgerBackedState) GetFileID(path string) (int, bool) {
 
 // Get video file for ID
 
-func (state *BadgerBackedState) GetVideoFile(ID int) (string, bool) {
-	file, found := state.id2file[ID]
+func (state *BadgerBackedState) GetVideoFile(id int) (string, bool) {
+	file, found := state.id2file[id]
 	return file, found
 }
 
@@ -215,7 +215,7 @@ func (state *BadgerBackedState) SetComparisonScore(frameID1, frameID2 int, score
 	}
 }
 
-func (state *BadgerBackedState) Compact() error {
+func (state *BadgerBackedState) Compact(stats *util.CompactionStats) error {
 	prefix := []byte(state.framePrefix)
 
 	// Step 1 - make sure we are in the right directory. Filenames are stored as relative paths so running
@@ -393,32 +393,13 @@ func (state *BadgerBackedState) Compact() error {
 		}
 	}
 
-	frameDeletePercentage := 0
-	scoreDeletePercentage := 0
-	fileDeletePercentage := 0
-
-	if numFrameEntries > 0 {
-		frameDeletePercentage = int(float64(numFrameEntriesDeleted) / float64(numFrameEntries) * 100.0)
-	}
-
-	if numScoreEntries > 0 {
-		scoreDeletePercentage = int(float64(numScoreEntriesDeleted) / float64(numScoreEntries) * 100.0)
-	}
-
-	if numImageFilesProcessed > 0 {
-		fileDeletePercentage = int(float64(numImageFilesDeleted) / float64(numImageFilesProcessed) * 100.0)
-	}
-
-	fmt.Printf(`
-Summary:
-* Deleted %d (%d%%) out of %d frame mapping records.
-* Deleted %d (%d%%) out of %d comparison score records.
-* Deleted %d (%d%%) out of %d frame files.
-
-`, numFrameEntriesDeleted, frameDeletePercentage, numFrameEntries,
-		numScoreEntriesDeleted, scoreDeletePercentage, numScoreEntries,
-		numImageFilesDeleted, fileDeletePercentage, numImageFilesProcessed)
-
+	stats.FrameFiles.WholeValue = numImageFilesProcessed
+	stats.FrameFiles.PartValue = numImageFilesDeleted
+	stats.FrameRecords.WholeValue = numFrameEntries
+	stats.FrameRecords.PartValue = numFrameEntriesDeleted
+	stats.ScoreRecords.WholeValue = numScoreEntries
+	stats.ScoreRecords.PartValue = numScoreEntriesDeleted
+	stats.Compacted = true
 	return nil
 }
 
@@ -499,11 +480,11 @@ func (state *BadgerBackedState) encodeFrameKey(path string) []byte {
 // Extract the filename from encoded frame key
 
 func (state *BadgerBackedState) decodeFrameKey(encoded []byte) string {
-	if prefixKeyLength < 0 {
-		prefixKeyLength = len([]byte(state.framePrefix))
+	if state.prefixKeyLength < 0 {
+		state.prefixKeyLength = len([]byte(state.framePrefix))
 	}
 
-	return string(encoded[prefixKeyLength:])
+	return string(encoded[state.prefixKeyLength:])
 }
 
 func (state *BadgerBackedState) encodeFrameValue(frameID int) []byte {
@@ -542,7 +523,7 @@ func (state *BadgerBackedState) decodeScoreKey(encoded []byte) (int, int) {
 func (state *BadgerBackedState) encodeScoreData(score float32, falsePositive bool) ([]byte, error) {
 	b := make([]byte, 5) // 4 bytes (float32) + 1 byte (bool)
 	binary.BigEndian.PutUint32(b, math.Float32bits(score))
-	b[4] = boolToByte(falsePositive)
+	b[4] = util.BoolToByte(falsePositive)
 	return b, nil
 }
 
@@ -589,11 +570,4 @@ func (state *BadgerBackedState) getMaxFrameID() (int, error) {
 	}
 
 	return maxFrameID, nil
-}
-
-func (state *BadgerBackedState) boolToByte(b bool) byte {
-	if b {
-		return 1
-	}
-	return 0
 }

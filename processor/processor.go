@@ -15,6 +15,7 @@ import (
 
 	"github.com/abelikoff/vidsim/match"
 	"github.com/abelikoff/vidsim/state"
+	"github.com/abelikoff/vidsim/util"
 	"github.com/sirupsen/logrus"
 )
 
@@ -28,7 +29,7 @@ type Processor struct {
 	numWorkers             int   // number of workers
 	frames                 []int // list of all frame IDs we will be processing
 	state                  state.State
-	stats                  StatsCollector
+	stats                  util.StatsCollector
 	logger                 *logrus.Logger
 	clusterer              match.Clusterer // responsible for clustering the matches
 	exclusionRx            *regexp.Regexp  // exclude files matching pattern
@@ -38,11 +39,12 @@ type Processor struct {
 	ExternalComparisonTool string                 // Program to use for image comparison
 	ClusteringMethod       match.ClusteringMethod // Clustering method
 	OutputWriter           *bufio.Writer          // where to write the report (nil means stdout)
-	SimilarityThreshold    float32                // images with similarity score above the threshold are considered a match
+	SimilarityThreshold    float32                // images with match score above the threshold are considered a match
 
 	ScorePrefix          string // Prefix to use for score records
 	UseAbsolutePaths     bool   // When true filenames will be stored in the state with absolute paths
 	IgnoreFalsePositives bool   // Treat false positives as matches
+	CompactState         bool   // Whether to compact state after processing
 	DebugMode            bool   // Enable debug mode
 
 	// These two parameters govern the image comparison.
@@ -120,6 +122,11 @@ func (proc *Processor) Process(directories []string) error {
 	proc.compareFrames()
 	proc.DebugDump()
 	proc.GenerateReport()
+
+	if proc.CompactState {
+		proc.state.Compact(&proc.stats.Compaction)
+	}
+
 	proc.ShowSummary()
 	return nil
 }
@@ -236,12 +243,6 @@ func (proc *Processor) Peek(args []string) error {
 	}
 
 	return nil
-}
-
-// Perform state datastore compaction
-
-func (proc *Processor) CompactState() error {
-	return proc.state.Compact()
 }
 
 // Dump the state

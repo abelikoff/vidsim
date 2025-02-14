@@ -29,7 +29,7 @@ func (rsp fcmpResponse) String() string {
 	return fmt.Sprintf("<cmp ERROR: %d <> %d: %s >", rsp.frameID1, rsp.frameID2, rsp.err)
 }
 
-func (proc *Processor) compareFrames() error {
+func (proc *Processor) compareFrames() {
 	var wg sync.WaitGroup
 	requestQueue := make(chan fcmpRequest)
 	responseQueue := make(chan fcmpResponse)
@@ -47,7 +47,6 @@ func (proc *Processor) compareFrames() error {
 	}()
 	proc.processComparisonResults(responseQueue)
 	proc.logger.Debugf("Done comparing frames")
-	return nil
 }
 
 func (proc *Processor) generateComparisonJobs(requestQueue chan fcmpRequest) {
@@ -62,12 +61,15 @@ func (proc *Processor) generateComparisonJobs(requestQueue chan fcmpRequest) {
 			score, falsePositive, found := proc.state.GetComparisonScore(frameID1, frameID2)
 
 			if found {
-				if falsePositive {
-					score = -1000
+				proc.stats.NumCacheHits++
+
+				if !falsePositive || proc.IgnoreFalsePositives {
+					proc.bucketResults(frameID1, frameID2, score)
+				} else {
+					proc.logger.Debugf("Frames %d and %d => false positive", frameID1, frameID2)
+					proc.stats.NumFalsePositives++
 				}
 
-				proc.bucketResults(frameID1, frameID2, score)
-				proc.stats.NumCacheHits++
 				proc.stats.IncNumComparisonsMade()
 				continue
 			}
@@ -99,7 +101,8 @@ func (proc *Processor) processComparisonResults(responseQueue chan fcmpResponse)
 	proc.logger.Debugf("Done processing %d responses", numResponses)
 }
 
-func (proc *Processor) fcmpWorker(workerID int, requestQueue chan fcmpRequest, responseQueue chan fcmpResponse, wg *sync.WaitGroup) {
+func (proc *Processor) fcmpWorker(workerID int, requestQueue chan fcmpRequest, responseQueue chan fcmpResponse,
+	wg *sync.WaitGroup) {
 	defer wg.Done()
 
 	for req := range requestQueue {
@@ -120,11 +123,7 @@ func (proc *Processor) bucketResults(frameID1, frameID2 int, score float32) {
 		frameID1, frameID2 = frameID2, frameID1
 	}
 
-	if proc.isFalsePositive(score) {
-		proc.logger.Debugf("Frames %d and %d => false positive", frameID1, frameID2)
-		proc.stats.NumFalsePositives++
-
-	} else if score >= proc.SimilarityThreshold {
+	if score >= proc.SimilarityThreshold {
 		proc.logger.Debugf("Bucketing frames %d and %d (score: %.4f)", frameID1, frameID2, score)
 		proc.bucketMutex.Lock()
 		proc.clusterer.AddMatch(frameID1, frameID2)
@@ -134,8 +133,4 @@ func (proc *Processor) bucketResults(frameID1, frameID2 int, score float32) {
 		proc.logger.Debugf("Frames %d and %d are below threshold (%f)", frameID1, frameID2, score)
 		proc.stats.NumMismatches++
 	}
-}
-
-func (proc *Processor) isFalsePositive(score float32) bool {
-	return score < 0 && !proc.IgnoreFalsePositives
 }

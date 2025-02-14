@@ -21,6 +21,7 @@ var chromTolerance *float64       // Chrominance tolerance flag
 var propTolerance *float64        // Proportion tolerance flag
 var useAbsolutePaths *bool        // Whether to store filenames with absolute paths
 var ignoreFalsePositives *bool    // Tread false positives as matches
+var compactState *bool            // Flag to drive state compaction
 
 // processCmd represents the process command
 var processCmd = &cobra.Command{
@@ -48,6 +49,7 @@ it consideres similar. The report is output in JSON format.
 		proc.ScorePrefix = *scorePrefix
 		proc.ExternalFramegenTool = *externalFramegenPgm
 		proc.ExternalComparisonTool = *externalComparisonPgm
+		proc.CompactState = *compactState
 		proc.DebugMode = *debugMode
 
 		switch *clusteringMode {
@@ -119,6 +121,8 @@ func init() {
 		"Lowest similarity score for images to be considered a match")
 	useAbsolutePaths = processCmd.Flags().BoolP("abs_paths", "",
 		false, "Store filenames with absolute paths")
+	compactState = processCmd.Flags().BoolP("compact", "",
+		false, "Compact state after processing")
 	ignoreFalsePositives = processCmd.Flags().BoolP("ignore_false_positives", "",
 		false, "Treat false positives as matches")
 	chromTolerance = processCmd.Flags().Float64P("chr_tolerance", "",

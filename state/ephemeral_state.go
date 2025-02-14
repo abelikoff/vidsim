@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"sync"
 
+	"github.com/abelikoff/vidsim/util"
 	"github.com/sirupsen/logrus"
 )
 
@@ -42,7 +43,7 @@ func MakeEphemeralState(stateDirectory string, logger *logrus.Logger) (*Ephemera
 		dirName, err := os.MkdirTemp("", "vidsim")
 
 		if err != nil {
-			return nil, fmt.Errorf("Failed to create a temporary directory: %s", err)
+			return nil, fmt.Errorf("Failed to create a temporary directory: %w", err)
 		}
 
 		state.dataDirectory = dirName
@@ -170,6 +171,6 @@ func (state *EphemeralState) DebugDump() {
 
 // Compact the state
 
-func (state *EphemeralState) Compact() error {
+func (state *EphemeralState) Compact(stats *util.StatsCollector) error {
 	return nil
 }

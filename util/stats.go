@@ -1,4 +1,4 @@
-package processor
+package util
 
 import (
 	"errors"
@@ -7,6 +7,30 @@ import (
 
 	"github.com/schollz/progressbar/v3"
 )
+
+// Convenince type to represent fractions and percentages for stats
+
+type Fraction struct {
+	WholeValue int
+	PartValue  int
+}
+
+func (frac *Fraction) IntPercentage() int {
+	if frac.WholeValue > 0 {
+		return int(float64(frac.PartValue) / float64(frac.WholeValue) * 100.0)
+	}
+
+	return -1000
+}
+
+// Compaction-related stats
+
+type CompactionStats struct {
+	Compacted    bool     // True when compaction occured
+	FrameRecords Fraction // Frame records stats
+	ScoreRecords Fraction // Score records stats
+	FrameFiles   Fraction // Frame files stats
+}
 
 type StatsCollector struct {
 	NumFilesToProcess   int
@@ -18,8 +42,8 @@ type StatsCollector struct {
 	NumCacheHits        int
 	NumMatches          int
 	NumFalsePositives   int
+	Compaction          CompactionStats
 	comparisonStartTime time.Time
-	prevPercentage      int
 	QuietMode           bool // don't show progress
 	bar                 *progressbar.ProgressBar
 }
@@ -98,8 +122,7 @@ Total comparisons:   %10d
 New comparisons:     %10d  (%d%%)
 Mismatches:          %10d
 Total matches:       %10d
-False positives:     %10d
-`,
+False positives:     %10d`,
 		stats.NumFilesToProcess,
 		stats.NumFramesToGenerate,
 		genPercentage,
@@ -116,6 +139,22 @@ False positives:     %10d
 
 	if stats.NumMismatches+stats.NumMatches+stats.NumFalsePositives != stats.NumTotalComparisons {
 		return errors.New("number of comparisons inconsistent match statistics")
+	}
+
+	if stats.Compaction.Compacted {
+		fmt.Printf(`
+Frames deleted:      %10d  (%d%%)
+Scores deleted:      %10d  (%d%%)
+Images deleted:      %10d  (%d%%)
+`,
+			stats.Compaction.FrameRecords.PartValue,
+			stats.Compaction.FrameRecords.IntPercentage(),
+			stats.Compaction.ScoreRecords.PartValue,
+			stats.Compaction.ScoreRecords.IntPercentage(),
+			stats.Compaction.FrameFiles.PartValue,
+			stats.Compaction.FrameFiles.IntPercentage())
+	} else {
+		fmt.Println("")
 	}
 
 	return nil
