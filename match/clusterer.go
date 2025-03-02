@@ -318,7 +318,7 @@ func (clr *UnionClusterer) AddMatch(frameID1 int, frameID2 int) {
 	if clr.groups[resultingBucket] == nil {
 		clr.groups[resultingBucket] = []int{frameID1, frameID2}
 	} else {
-		clr.groups[resultingBucket] = append(clr.groups[resultingBucket], frameID1, frameID2)
+		clr.groups[resultingBucket] = removeDuplicates(append(clr.groups[resultingBucket], frameID1, frameID2))
 	}
 }
 
