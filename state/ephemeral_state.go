@@ -100,6 +100,19 @@ func (state *EphemeralState) GetVideoFile(frameID int) (string, bool) {
 	return path, found
 }
 
+// ScanFiles scans all files in the state and calls the callback function for each file.
+// The callback should return true to continue scanning, false to stop.
+func (state *EphemeralState) ScanFiles(callback func(id int, path string) bool) {
+	state.mutex.RLock()
+	defer state.mutex.RUnlock()
+	
+	for id, path := range state.frame2image {
+		if !callback(id, path) {
+			break
+		}
+	}
+}
+
 // Get frame file based on ID
 
 func (state *EphemeralState) GetFrameFile(frameID int) string {
@@ -171,6 +184,6 @@ func (state *EphemeralState) DebugDump() {
 
 // Compact the state
 
-func (state *EphemeralState) Compact(stats *util.StatsCollector) error {
+func (state *EphemeralState) Compact(stats *util.CompactionStats) error {
 	return nil
 }

@@ -168,6 +168,57 @@ func (proc *Processor) Unmatch(files []string) error {
 	return nil
 }
 
+// Mark files specified as false positive vs all other files in the state.
+func (proc *Processor) UnmatchAll(files []string) error {
+	if len(files) < 1 {
+		proc.logger.Fatal("Unmatching requires at least one file")
+	}
+
+	failed := false
+
+	// Get all file IDs in the state
+	allFileIDs := make(map[int]bool)
+
+	// Collect all files that are going to be marked as false positives
+	targetFiles := make(map[int]string)
+
+	for _, file := range files {
+		frameID, found := proc.state.GetFileID(file)
+
+		if !found {
+			proc.logger.Errorf("File '%s' is unknown", file)
+			failed = true
+			continue
+		}
+
+		targetFiles[frameID] = file
+	}
+
+	if failed {
+		return errors.New("Failed to unmatch files: some files not found")
+	}
+
+	// For each file in the state, scan it to get all frameIDs
+	proc.state.ScanFiles(func(id int, path string) bool {
+		allFileIDs[id] = true
+		return true
+	})
+
+	// Mark each target file as false positive with all other files
+	for targetID := range targetFiles {
+		for otherID := range allFileIDs {
+			// Skip self-comparison
+			if targetID == otherID {
+				continue
+			}
+
+			proc.state.SetComparisonScore(targetID, otherID, 0, true)
+		}
+	}
+
+	return nil
+}
+
 // Peek functionality
 
 func (proc *Processor) Peek(args []string) error {

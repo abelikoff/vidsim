@@ -149,6 +149,49 @@ func (state *BadgerBackedState) GetVideoFile(id int) (string, bool) {
 	return file, found
 }
 
+// Scan all files in the state and call the callback function for each file.
+// The callback should return true to continue scanning, false to stop.
+func (state *BadgerBackedState) ScanFiles(callback func(id int, path string) bool) {
+	prefix := []byte(state.framePrefix)
+
+	err := state.db.View(func(txn *badger.Txn) error {
+		opts := badger.DefaultIteratorOptions
+		it := txn.NewIterator(opts)
+		defer it.Close()
+
+		for it.Seek(prefix); it.ValidForPrefix(prefix); it.Next() {
+			item := it.Item()
+			path := state.decodeFrameKey(item.Key())
+
+			var id int
+			err := item.Value(func(val []byte) error {
+				id = state.decodeFrameValue(val)
+				return nil
+			})
+
+			if err != nil {
+				state.logger.Errorf("Error decoding frame value: %s", err)
+				continue
+			}
+
+			// Store in id2file map if not already there
+			if _, ok := state.id2file[id]; !ok {
+				state.id2file[id] = path
+			}
+
+			if !callback(id, path) {
+				break
+			}
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		state.logger.Errorf("Error scanning files: %s", err)
+	}
+}
+
 // Get name of the image frame file corresponding to the frame ID
 
 func (state *BadgerBackedState) GetFrameFile(frameID int) string {

@@ -10,15 +10,18 @@ import (
 	"github.com/spf13/cobra"
 )
 
+var unmatchAll bool // unmatch specified files with all other files
+
 // unmatchCmd represents the unmatch command
 var unmatchCmd = &cobra.Command{
 	Use:   "unmatch",
 	Short: "Mark specified files as false positive match",
 	Long: `Even though the frame comparison might yield a match, one can indicate that specified files
-
 are not identical so that in future runs they would not be reported as a match.
 
-This command only works with persistent state.`,
+This command only works with persistent state.
+
+Use the -a flag to mark each specified file as a false positive match with all other files.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		logger := MakeLogger()
 		nWorkers := *numWorkers
@@ -29,7 +32,13 @@ This command only works with persistent state.`,
 
 		logger.Infof("Running with %d parallel workers", nWorkers)
 		proc := processor.MakeProcessor(nWorkers, *stateDirectory, logger)
-		err := proc.Unmatch(args)
+
+		var err error
+		if unmatchAll {
+			err = proc.UnmatchAll(args)
+		} else {
+			err = proc.Unmatch(args)
+		}
 
 		if err != nil {
 			logger.Fatal("Processing failed")
@@ -48,5 +57,6 @@ func init() {
 
 	// Cobra supports local flags which will only run when this command
 	// is called directly, e.g.:
-	// unmatchCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
+	unmatchCmd.Flags().BoolVarP(&unmatchAll, "all", "a", false,
+		"Mark each specified file as a false positive with any other file")
 }
