@@ -9,7 +9,7 @@ if [[ $# -ne 3 ]]; then
 
 $(basename $0) also supports the following options via environment variables:
 
-FRAMEGEN_CROP - when set, defines the cropping strategy:
+- FRAMEGEN_CROP - when set, defines the cropping strategy:
 
     - UL: Upper left quadrant
     - UR: Upper right quadrant
@@ -20,7 +20,9 @@ FRAMEGEN_CROP - when set, defines the cropping strategy:
     - stripes4: Top and bottom stripes of a frame cut into 4 stripes
     - <not set>: Use full frame
 
-FRAMEGEN_GRAYSCALE - when set, convert to grayscale.
+- FRAMEGEN_GRAYSCALE - when set, convert to grayscale.
+
+- FRAMEGEN_SCALE - when set, defines the output frame size (default is ${scale})
 " >&2
     exit 1
 fi
@@ -28,6 +30,8 @@ fi
 readonly video_file="$1"
 readonly frame_file="$2"
 readonly offset="$3"
+readonly scale="${FRAMEGEN_SCALE:-500:500}"
+readonly ffmpeg_common_opts="-hide_banner -loglevel quiet -y"
 
 if [[ -n $FRAMEGEN_GRAYSCALE ]]; then
     grayscale="format=gray,"
@@ -38,31 +42,31 @@ fi
 case "${FRAMEGEN_CROP:-}" in
     UL)
         readonly quad_opts="crop=in_w/2:in_h/2:0:0"
-        exec ffmpeg -hide_banner -loglevel quiet -y -ss "$offset" -i "$video_file" \
-            -vf "${grayscale} $quad_opts, scale=500:500" -frames:v 1 -q:v 2 -s 500x500 "$frame_file"
+        exec ffmpeg $ffmpeg_common_opts -ss "$offset" -i "$video_file" \
+            -vf "${grayscale} $quad_opts, scale=${scale}" -frames:v 1 -q:v 2 "$frame_file"
         exit 1
         ;;
     UR)
         quad_opts="crop=in_w/2:in_h/2:in_w/2:0"
-        exec ffmpeg -hide_banner -loglevel quiet -y -ss "$offset" -i "$video_file" \
-            -vf "${grayscale} $quad_opts, scale=500:500" -frames:v 1 -q:v 2 -s 500x500 "$frame_file"
+        exec ffmpeg $ffmpeg_common_opts -ss "$offset" -i "$video_file" \
+            -vf "${grayscale} $quad_opts, scale=${scale}" -frames:v 1 -q:v 2 "$frame_file"
         exit 1
         ;;
     LL)
         quad_opts="crop=in_w/2:in_h/2:0:in_h/2"
-        exec ffmpeg -hide_banner -loglevel quiet -y -ss "$offset" -i "$video_file" \
-            -vf "${grayscale} $quad_opts, scale=500:500" -frames:v 1 -q:v 2 -s 500x500 "$frame_file"
+        exec ffmpeg $ffmpeg_common_opts -ss "$offset" -i "$video_file" \
+            -vf "${grayscale} $quad_opts, scale=${scale}" -frames:v 1 -q:v 2 "$frame_file"
         exit 1
         ;;
     LR)
         quad_opts="crop=in_w/2:in_h/2:in_w/2:in_h/2"
-        exec ffmpeg -hide_banner -loglevel quiet -y -ss "$offset" -i "$video_file" \
-            -vf "${grayscale} $quad_opts, scale=500:500" -frames:v 1 -q:v 2 -s 500x500 "$frame_file"
+        exec ffmpeg $ffmpeg_common_opts -ss "$offset" -i "$video_file" \
+            -vf "${grayscale} $quad_opts, scale=${scale}" -frames:v 1 -q:v 2 "$frame_file"
         exit 1
         ;;
 
     corners)
-        exec ffmpeg -hide_banner -loglevel quiet -y -ss "$offset" -i "$video_file" -frames:v 1 \
+        exec ffmpeg $ffmpeg_common_opts -ss "$offset" -i "$video_file" -frames:v 1 \
             -filter_complex "\
                 [0:v]split=4[v1][v2][v3][v4];\
                 [v1]crop=iw/3:ih/3:0:0[tl];\
@@ -71,34 +75,41 @@ case "${FRAMEGEN_CROP:-}" in
                 [v4]crop=iw/3:ih/3:iw*2/3:ih*2/3[br];\
                 [tl][tr]hstack[toprow];\
                 [bl][br]hstack[bottomrow];\
-                [toprow][bottomrow]vstack,${grayscale} scale=500:500\
+                [toprow][bottomrow]vstack,${grayscale} scale=${scale}\
             " "$frame_file"
         exit 1
         ;;
 
     stripes3)
-        exec ffmpeg -hide_banner -loglevel quiet -y -ss "$offset" -i "$video_file" -frames:v 1 \
+        exec ffmpeg $ffmpeg_common_opts -ss "$offset" -i "$video_file" -frames:v 1 \
             -filter_complex "\
                 [0:v]split=2[v_top][v_bottom];\
                 [v_top]crop=iw:ih/3:0:0[top_stripe];\
                 [v_bottom]crop=iw:ih/3:0:ih*2/3[bottom_stripe];\
-                [top_stripe][bottom_stripe]vstack,${grayscale} scale=500:500\
+                [top_stripe][bottom_stripe]vstack,${grayscale} scale=${scale}\
             " "$frame_file"
         exit 1
         ;;
 
     stripes4)
-        exec ffmpeg -hide_banner -loglevel quiet -y -ss "$offset" -i "$video_file" -frames:v 1 \
+        exec ffmpeg $ffmpeg_common_opts -ss "$offset" -i "$video_file" -frames:v 1 \
             -filter_complex "\
                 [0:v]split=2[v_first_stripe][v_fourth_stripe];\
                 [v_first_stripe]crop=iw:ih/4:0:0[first_stripe];\
                 [v_fourth_stripe]crop=iw:ih/4:0:ih*3/4[fourth_stripe];\
-                [first_stripe][fourth_stripe]vstack,${grayscale} scale=500:500\
+                [first_stripe][fourth_stripe]vstack,${grayscale} scale=${scale}\
             " "$frame_file"
         exit 1
         ;;
-esac
 
-exec ffmpeg -hide_banner -loglevel quiet -y -ss "$offset" -i "$video_file" \
-    -vf "${grayscale} scale=500:500" -frames:v 1 -q:v 2 -s 500x500 "$frame_file"
-exit 1
+    "")
+        exec ffmpeg $ffmpeg_common_opts -ss "$offset" -i "$video_file" \
+            -vf "${grayscale} scale=${scale}" -frames:v 1 -q:v 2 "$frame_file"
+        exit 1
+        ;;
+
+    *)
+        echo "ERROR: invalid FRAMEGEN_CROP value: '$FRAMEGEN_CROP'" >&2
+        exit 1
+        ;;
+esac
