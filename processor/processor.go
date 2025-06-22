@@ -1,6 +1,15 @@
-/*
-Copyright © 2024 Alexander L. Belikoff <alexander@belikoff.net>
-*/
+// ==========================================================================
+// vidsim - a tool to compare and group large sets of images for similarity.
+//
+// Copyright © 2024 Alexander L. Belikoff <alexander@belikoff.net>
+//
+// This software is released under the BSD 3-Clause License. See the LICENSE
+// file for details.
+//
+// https://github.com/abelikoff/vidsim
+//
+// ==========================================================================
+
 package processor
 
 import (
@@ -20,8 +29,8 @@ import (
 )
 
 const (
-	DefaultChrominanceTolerance = 0.3
-	DefaultProportionTolerance  = 10.0
+	DefaultChrominanceTolerance = 1.0
+	DefaultProportionTolerance  = 1.0
 	DefaultSimilarityThreshold  = 0.7
 )
 
