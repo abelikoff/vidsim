@@ -92,6 +92,8 @@ func (stats *StatsCollector) IncNumComparisonsMade() {
 
 	if !stats.QuietMode {
 		stats.bar.Add(1)
+		stats.bar.Describe(fmt.Sprintf("Comparing frames...[%d new/%d matches]  ",
+			stats.NumComparisonsMade-stats.NumCacheHits, stats.NumMatches))
 		/*if percentageDone > stats.prevPercentage {
 			fmt.Printf("Done %d/%d (%d%%) comparisons    %s\n",
 				stats.NumComparisonsMade, stats.NumTotalComparisons, percentageDone, eta)
