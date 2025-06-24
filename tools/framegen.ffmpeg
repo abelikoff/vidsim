@@ -18,6 +18,7 @@ $(basename $0) also supports the following options via environment variables:
     - corners: Combined four corners of a 3x3 grid
     - stripes3: Top and bottom stripes of a frame cut into 3 stripes
     - stripes4: Top and bottom stripes of a frame cut into 4 stripes
+    - topcorners: Upper two corners of a 3x3 grid
     - <not set>: Use full frame
 
 - FRAMEGEN_GRAYSCALE - when set, convert to grayscale.
@@ -98,6 +99,17 @@ case "${FRAMEGEN_CROP:-}" in
                 [v_first_stripe]crop=iw:ih/4:0:0[first_stripe];\
                 [v_fourth_stripe]crop=iw:ih/4:0:ih*3/4[fourth_stripe];\
                 [first_stripe][fourth_stripe]vstack,${grayscale} scale=${scale}\
+            " "$frame_file"
+        exit 1
+        ;;
+
+    topcorners)
+        exec ffmpeg $ffmpeg_common_opts -ss "$offset" -i "$video_file" -frames:v 1 \
+            -filter_complex "\
+                [0:v]split=2[left][right];\
+                [left]crop=iw/3:ih/3:0:0[topleft];\
+                [right]crop=iw/3:ih/3:iw*2/3:0[topright];\
+                [topleft][topright]hstack,${grayscale} scale=${scale}\
             " "$frame_file"
         exit 1
         ;;
