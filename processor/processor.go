@@ -20,6 +20,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"strconv"
+	"strings"
 	"sync"
 
 	"github.com/abelikoff/vidsim/match"
@@ -40,8 +41,8 @@ type Processor struct {
 	state                  state.State
 	stats                  util.StatsCollector
 	logger                 *logrus.Logger
-	clusterer              match.Clusterer // responsible for clustering the matches
-	exclusionRx            *regexp.Regexp  // exclude files matching pattern
+	clusterer              match.Clusterer  // responsible for clustering the matches
+	exclusionRxList        []*regexp.Regexp // exclude files matching patterns in this list
 	bucketMutex            sync.Mutex
 	QuietMode              bool                   // be really quiet (only show warnings and errors)
 	ExternalFramegenTool   string                 // Program to use for frame generation
@@ -96,9 +97,43 @@ func (proc *Processor) SetExclusionPattern(pattern string) error {
 		return nil
 	}
 
-	var err error
-	proc.exclusionRx, err = regexp.Compile(pattern)
+	rx, err := regexp.Compile(pattern)
+	proc.exclusionRxList = append(proc.exclusionRxList, rx)
 	return err
+}
+
+func (proc *Processor) SetExclusionPatternFile(filename string) error {
+	if filename == "" {
+		return nil
+	}
+
+	file, err := os.Open(filename)
+
+	if err != nil {
+		return err
+	}
+
+	defer file.Close()
+
+	scanner := bufio.NewScanner(file)
+
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue // skip empty lines and comments
+		}
+
+		var rx *regexp.Regexp
+		rx, err = regexp.Compile(line)
+
+		if err != nil {
+			return err
+		}
+
+		proc.exclusionRxList = append(proc.exclusionRxList, rx)
+	}
+
+	return scanner.Err()
 }
 
 func (proc *Processor) Process(directories []string) error {

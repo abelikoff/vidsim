@@ -30,11 +30,12 @@ var rootCmd = &cobra.Command{
 
 // configuration options
 
-var numWorkers *int        // number of parallel workers to use
-var excludePattern *string // pattern to exclude matching files
-var stateDirectory *string // location of persistent state
-var outputFile *string     // where to output the report
-var scorePrefix *string    // Prefix to use for score records
+var numWorkers *int            // number of parallel workers to use
+var excludePattern *string     // pattern to exclude matching files
+var excludePatternFile *string // file containing patterns to exclude matching files
+var stateDirectory *string     // location of persistent state
+var outputFile *string         // where to output the report
+var scorePrefix *string        // Prefix to use for score records
 var verboseMode *bool
 var debugMode *bool
 var quietMode *bool
@@ -62,8 +63,10 @@ func init() {
 		"Prefix to use for score data")
 	outputFile = rootCmd.PersistentFlags().StringP("output_file", "o", "",
 		"file to output the report to")
-	excludePattern = rootCmd.PersistentFlags().StringP("exclude", "X", "",
-		"directory to store/use the state")
+	excludePattern = rootCmd.PersistentFlags().StringP("exclude", "x", "",
+		"regex pattern to exclude matching files")
+	excludePatternFile = rootCmd.PersistentFlags().StringP("exclude_file", "X", "",
+		"file containing regex patterns to exclude matching files")
 	verboseMode = rootCmd.PersistentFlags().BoolP("verbose", "v", false,
 		"verbose mode")
 	debugMode = rootCmd.PersistentFlags().BoolP("debug", "", false,

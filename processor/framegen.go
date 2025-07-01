@@ -64,7 +64,13 @@ func (proc *Processor) generateFrames(directories []string) error {
 	// delete failed files from the table
 
 	for e := failedFrames.Front(); e != nil; e = e.Next() {
-		frameID := e.Value.(int)
+		frameID, ok := e.Value.(int)
+
+		if !ok {
+			proc.logger.Errorf("Bad frameID in failedFrames list: %v", e.Value)
+			continue
+		}
+
 		delete(frames, frameID)
 	}
 
@@ -84,7 +90,7 @@ func (proc *Processor) generateFrames(directories []string) error {
 
 func (proc *Processor) fgSendJobs(directories []string, requestQueue chan fgRequest, frames *map[int]bool) {
 	for _, dir := range directories {
-		filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
+		err := filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
 			if err != nil {
 				return err
 			}
@@ -118,6 +124,11 @@ func (proc *Processor) fgSendJobs(directories []string, requestQueue chan fgRequ
 
 			return nil
 		})
+
+		if err != nil {
+			proc.logger.Fatalf("Failed to traverse directory '%s': %v", dir, err)
+			os.Exit(1)
+		}
 	}
 
 	close(requestQueue)
@@ -136,7 +147,8 @@ func (proc *Processor) fgProcessResults(responseQueue chan fgResponse, failedFra
 	}
 }
 
-func (proc *Processor) fgWorker(workerID int, requestQueue chan fgRequest, responseQueue chan fgResponse, wg *sync.WaitGroup) {
+func (proc *Processor) fgWorker(workerID int, requestQueue chan fgRequest, responseQueue chan fgResponse,
+	wg *sync.WaitGroup) {
 	defer wg.Done()
 
 	for req := range requestQueue {
@@ -207,7 +219,8 @@ func (proc *Processor) generateFrameAtOffset(path string, frameFile string, offs
 	err := cmd.Run()
 
 	if err != nil {
-		if exitError, ok := err.(*exec.ExitError); ok {
+		var exitError *exec.ExitError
+		if errors.As(err, &exitError) {
 			return fmt.Errorf("frame generation failed (%d)", exitError.ExitCode())
 		}
 
@@ -249,8 +262,10 @@ func (proc *Processor) isEligibleFile(path string) bool {
 		return false
 	}
 
-	if proc.exclusionRx != nil {
-		return !proc.exclusionRx.MatchString(path)
+	for _, rx := range proc.exclusionRxList {
+		if rx.MatchString(path) {
+			return false
+		}
 	}
 
 	return true
@@ -264,7 +279,7 @@ func normalizePath(relativePath string) (string, error) {
 	cwd, err := os.Getwd()
 
 	if err != nil {
-		return "", fmt.Errorf("error getting working directory: %v", err)
+		return "", fmt.Errorf("error getting working directory: %w", err)
 	}
 
 	fullPath := filepath.Join(cwd, relativePath)
@@ -272,7 +287,7 @@ func normalizePath(relativePath string) (string, error) {
 	normalizedPath, err := filepath.Abs(fullPath)
 
 	if err != nil {
-		return "", fmt.Errorf("error normalizing path: %v", err)
+		return "", fmt.Errorf("error normalizing path: %w", err)
 	}
 
 	return normalizedPath, nil

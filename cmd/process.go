@@ -95,7 +95,13 @@ it consideres similar. The report is output in JSON format.
 		err := proc.SetExclusionPattern(*excludePattern)
 
 		if err != nil {
-			logger.Fatal("Processing failed")
+			logger.Fatalf("Failed to set exclusion pattern: %v", err)
+		}
+
+		err = proc.SetExclusionPatternFile(*excludePatternFile)
+
+		if err != nil {
+			logger.Fatalf("Failed to read exclusion patterns: %v", err)
 		}
 
 		err = proc.Process(args)
