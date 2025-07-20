@@ -16,6 +16,8 @@ $(basename $0) also supports the following options via environment variables:
     - LL: Lower left quadrant
     - LR: Lower right quadrant
     - corners: Combined four corners of a 3x3 grid
+    - topthird: Top 1/3rd of a frame
+    - topfourth: Top 1/4th of a frame
     - stripes3: Top and bottom stripes of a frame cut into 3 stripes
     - stripes4: Top and bottom stripes of a frame cut into 4 stripes
     - topcorners: Upper two corners of a 3x3 grid
@@ -111,6 +113,20 @@ case "${FRAMEGEN_CROP:-}" in
                 [right]crop=iw/3:ih/3:iw*2/3:0[topright];\
                 [topleft][topright]hstack,${grayscale} scale=${scale}\
             " "$frame_file"
+        exit 1
+        ;;
+
+    topthird)
+        readonly quad_opts="crop=in_w:in_h/3:0:0"
+        exec ffmpeg $ffmpeg_common_opts -ss "$offset" -i "$video_file" \
+            -vf "${grayscale} $quad_opts, scale=${scale}" -frames:v 1 -q:v 2 "$frame_file"
+        exit 1
+        ;;
+
+    topfourth)
+        readonly quad_opts="crop=in_w:in_h/4:0:0"
+        exec ffmpeg $ffmpeg_common_opts -ss "$offset" -i "$video_file" \
+            -vf "${grayscale} $quad_opts, scale=${scale}" -frames:v 1 -q:v 2 "$frame_file"
         exit 1
         ;;
 
