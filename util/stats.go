@@ -54,6 +54,7 @@ type StatsCollector struct {
 	NumCacheHits        int
 	NumMatches          int
 	NumFalsePositives   int
+	NumErrors           int
 	Compaction          CompactionStats
 	comparisonStartTime time.Time
 	QuietMode           bool // don't show progress
@@ -134,6 +135,7 @@ Video files:         %10d
 Frames generated:    %10d  (%d%%)
 Total comparisons:   %10d
 New comparisons:     %10d  (%d%%)
+Comparison errors:   %10d
 Mismatches:          %10d
 Total matches:       %10d
 False positives:     %10d`,
@@ -143,6 +145,7 @@ False positives:     %10d`,
 		stats.NumTotalComparisons,
 		stats.NumTotalComparisons-stats.NumCacheHits,
 		compPercentage,
+		stats.NumErrors,
 		stats.NumMismatches,
 		stats.NumMatches,
 		stats.NumFalsePositives)
@@ -151,8 +154,8 @@ False positives:     %10d`,
 		return errors.New("number of comparisons inconsistent with number of files")
 	}
 
-	if stats.NumMismatches+stats.NumMatches+stats.NumFalsePositives != stats.NumTotalComparisons {
-		return errors.New("number of comparisons inconsistent match statistics")
+	if stats.NumMismatches+stats.NumMatches+stats.NumFalsePositives+stats.NumErrors != stats.NumTotalComparisons {
+		return errors.New("number of comparisons inconsistent with match statistics")
 	}
 
 	if stats.Compaction.Compacted {
