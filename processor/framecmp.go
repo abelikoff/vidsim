@@ -105,6 +105,8 @@ func (proc *Processor) processComparisonResults(responseQueue chan fcmpResponse)
 		if response.err == nil {
 			proc.state.SetComparisonScore(response.frameID1, response.frameID2, response.score, false)
 			proc.bucketResults(response.frameID1, response.frameID2, response.score)
+		} else {
+			proc.stats.NumMismatches++
 		}
 
 		proc.stats.IncNumComparisonsMade()
